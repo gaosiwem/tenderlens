@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.local
+.DS_Store
+*.log
+coverage
+tests
+test_output*.txt
+.git
+.gitignore
+README.md
+postman.collection.json

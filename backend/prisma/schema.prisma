@@ -1,0 +1,1400 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model User {
+  id             String          @id @default(uuid())
+  email          String          @unique
+  passwordHash   String?
+  googleId       String?         @unique
+  emailVerifiedAt DateTime?
+  avatarUrl      String?
+  name           String?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  memberships    Membership[]
+  refreshTokens  RefreshToken[]
+  passwordResets PasswordReset[]
+  emailVerificationTokens EmailVerificationToken[]
+  auditLogs      AuditLog[]
+  createdTenders Tender[]
+  watchlist      WatchlistItem[]
+  notificationPrefs UserNotificationPrefs[]
+  whatsAppVerifications WhatsAppVerification[]
+  assignedTasks        BidTask[]              @relation("AssignedTasks")
+  createdTasks         BidTask[]              @relation("CreatedTasks")
+  bidTaskComments      BidTaskComment[]
+  bidAttachments       BidAttachment[]
+  bidActivities        BidActivityLog[]
+  mentionsSent         Mention[]              @relation("MentionFrom")
+  mentionsReceived     Mention[]              @relation("MentionTo")
+  taskReminderLogs     TaskReminderLog[]
+  referralCodes        ReferralCode[]
+}
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String       @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  memberships Membership[]
+  auditLogs   AuditLog[]
+  apiKeys     ApiKey[]
+  tenders     Tender[]
+  tenderFiles TenderFile[]
+  processingJobs ProcessingJob[]
+  tenderExtracts TenderExtract[]
+  chunks         TenderChunk[]
+  insights       TenderInsight[]
+
+  billingPolicy OrgBillingPolicy?
+  businessProfile OrgBusinessProfile?
+  conversations Conversation[]
+  messages      Message[]
+  notificationEvents NotificationEvent[]
+  tenderSummaries    TenderSummary[]
+  alertRules         AlertRule[]
+  notificationDeliveries NotificationDelivery[]
+  subscription       OrgSubscription?
+  watchlistItems     WatchlistItem[]
+  userNotificationPrefs UserNotificationPrefs[]
+  tenderDeadlines    TenderDeadline[]
+  tenderChangeLogs   TenderChangeLog[]
+  whatsAppVerifications WhatsAppVerification[]
+  tenderReminders    TenderReminder[]
+  tenderComparisons  TenderComparison[]
+  bidChecklists      BidChecklist[]
+  bidWorkspaces      BidWorkspace[]
+  mentions           Mention[]
+  billingEvents      BillingEvent[]
+  invoices           OrgInvoice[]
+  
+  // Revenue Sprint 3
+  invites             OrgInvite[]
+  entitlementWarnings OrgEntitlementWarning[]
+  experimentAssignments ExperimentAssignment[]
+  referralCodes       ReferralCode[]
+  referralAttributions ReferralAttribution[]
+  workspaceTemplates   WorkspaceTemplate[]
+  integrationEndpoints OrgIntegrationEndpoint[]
+  supportTickets       OrgSupportTicket[]
+}
+
+model Membership {
+  id        String       @id @default(uuid())
+  userId    String
+  orgId     String
+  role      Role         @default(MEMBER)
+  isBillingAdmin Boolean @default(false)
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+  @@index([userId])
+}
+
+model AuditLog {
+  id         String        @id @default(uuid())
+  orgId      String?
+  userId     String?
+  action     String
+  entityType String?
+  entityId   String?
+  meta       Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime      @default(now())
+  org        Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  user       User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ApiKey {
+  id         String       @id @default(uuid())
+  orgId      String
+  name       String
+  keyHash    String
+  lastUsedAt DateTime?
+  createdAt  DateTime     @default(now())
+  revokedAt  DateTime?
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+enum TenderStatus {
+  DRAFT
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum JobType {
+  EXTRACT_TEXT
+}
+
+model Tender {
+  id              String       @id @default(uuid())
+  orgId           String?
+  title           String
+  source          String?
+  status          TenderStatus  @default(DRAFT)
+  lifecycle       String?
+  lifecycleDetectedAt DateTime?
+  lifecycleDateSource String?
+  externalId      Int?
+  available       Boolean       @default(false)
+  tenderNumber    String?
+  description     String?
+  category        String?
+  companyName     String?
+  province        String?
+  scrapedStatus   String?
+  publishedDate   String?
+  closingDate     String?
+  amount          String?
+  documents       Json?
+  lastScrapedAt   DateTime?
+  createdByUserId String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  org Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  files    TenderFile[]
+  jobs     ProcessingJob[]
+  extracts TenderExtract[]
+  chunks   TenderChunk[]
+  insights TenderInsight[]
+  summaries TenderSummary[]
+  watchlist WatchlistItem[]
+  deadlines TenderDeadline?
+  changeLogs TenderChangeLog[]
+  reminders  TenderReminder[]
+  comparisonsA TenderComparison[] @relation("ComparisonA")
+  comparisonsB TenderComparison[] @relation("ComparisonB")
+  bidChecklists BidChecklist[]
+  bidWorkspaces BidWorkspace[]
+
+  @@index([orgId])
+  @@index([externalId])
+  @@index([lifecycle])
+  @@index([createdAt])
+}
+
+model TenderFile {
+  id               String   @id @default(uuid())
+  orgId            String
+  tenderId         String
+  storageKey       String
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  checksumSha256   String
+  contentHash      String?
+  createdAt        DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  jobs     ProcessingJob[]
+  extracts TenderExtract[]
+  chunks   TenderChunk[]
+  insights TenderInsight[]
+
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([createdAt])
+}
+
+enum BidTaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum BidTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum BidDecision {
+  PENDING
+  GO
+  NO_GO
+}
+
+enum TaskReminderType {
+  DUE_SOON
+  OVERDUE
+  BLOCKED
+  ASSIGNED
+  MENTIONED
+}
+
+model BidWorkspace {
+  id        String   @id @default(uuid())
+  orgId     String
+  tenderId  String
+  createdBy String   @default("system")
+  status    String   @default("DRAFT") // WorkspaceStatus
+  decision  String?  // "Bid" | "No-bid" | null
+  notes     String?
+  riskScore Float    @default(0)
+  riskMeta  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  tasks       BidTask[]
+  attachments BidAttachment[]
+  activities  BidActivityLog[]
+
+  @@unique([orgId, tenderId])
+  @@index([orgId])
+}
+
+model BidTask {
+  id          String   @id @default(uuid())
+  orgId       String
+  workspaceId String
+  title       String
+  description String?
+  status      String   @default("TODO") // TaskStatus
+  priority    String   @default("MEDIUM") // TaskPriority
+  dueAt       DateTime?
+  tags        String[] @default([])
+
+  ownerId     String?
+  createdBy   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace BidWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner     User?        @relation("AssignedTasks", fields: [ownerId], references: [id], onDelete: SetNull)
+  creator   User         @relation("CreatedTasks", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  comments BidTaskComment[]
+  mentions Mention[]
+  reminderLogs TaskReminderLog[]
+  attachments BidAttachment[]
+
+  @@index([orgId])
+  @@index([workspaceId])
+  @@index([ownerId])
+  @@index([dueAt])
+}
+
+model BidTaskComment {
+  id        String   @id @default(uuid())
+  orgId     String
+  taskId    String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+
+  task BidTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  mentions Mention[]
+
+  @@index([orgId])
+  @@index([taskId])
+}
+
+enum AttachmentTargetType {
+  WORKSPACE
+  TASK
+}
+
+model BidAttachment {
+  id          String   @id @default(uuid())
+  orgId       String
+  workspaceId String
+  taskId      String?
+  targetType  AttachmentTargetType @default(WORKSPACE)
+
+  filename    String
+  mimeType    String
+  sizeBytes   Int
+  storageKey  String
+  url         String?
+
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+
+  workspace BidWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  task      BidTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([workspaceId])
+  @@index([taskId])
+}
+
+enum ActivityType {
+  WORKSPACE_CREATED
+  WORKSPACE_UPDATED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_STATUS_CHANGED
+  TASK_ASSIGNED
+  COMMENT_ADDED
+  ATTACHMENT_ADDED
+}
+
+model BidActivityLog {
+  id          String   @id @default(uuid())
+  orgId       String
+  workspaceId String
+  userId      String
+  type        ActivityType
+  meta        Json?
+  createdAt   DateTime @default(now())
+
+  workspace BidWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([workspaceId])
+  @@index([createdAt])
+}
+
+
+model WhatsAppVerification {
+  id           String   @id @default(uuid())
+  orgId        String
+  userId       String
+  whatsappNumber String
+  otpHash      String
+  expiresAt    DateTime
+  attempts     Int      @default(0)
+  verifiedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum ReminderType {
+  CLOSING_7D
+  CLOSING_24H
+  CLOSING_2H
+  BRIEFING_SESSION
+  SITE_VISIT
+  TASK_DUE
+}
+
+model TenderReminder {
+  id        String      @id @default(uuid())
+  orgId     String
+  userId    String?
+  tenderId  String
+  type      ReminderType
+  fireAt    DateTime
+  firedAt   DateTime?
+  createdAt DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@unique([tenderId, type, fireAt])
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([fireAt])
+  @@index([firedAt])
+}
+
+model TenderComparison {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String?
+  tenderAId String
+  tenderBId String
+  result    Json
+  createdAt DateTime @default(now())
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tenderA Tender       @relation("ComparisonA", fields: [tenderAId], references: [id], onDelete: Cascade)
+  tenderB Tender       @relation("ComparisonB", fields: [tenderBId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([tenderAId])
+  @@index([tenderBId])
+}
+
+model BidChecklist {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String?
+  tenderId  String
+  title     String
+  checklist Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, tenderId])
+  @@index([orgId])
+  @@index([tenderId])
+}
+
+model ProcessingJob {
+  id           String    @id @default(uuid())
+  orgId        String
+  tenderId     String
+  tenderFileId String
+  type         JobType
+  status       JobStatus @default(QUEUED)
+  attempts     Int       @default(0)
+  lastError    String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  file   TenderFile   @relation(fields: [tenderFileId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([tenderFileId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model TenderExtract {
+  id           String   @id @default(uuid())
+  orgId        String
+  tenderId     String
+  tenderFileId String
+  text         String
+  pageCount    Int?
+  language     String?
+  meta         Json?
+  createdAt    DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  file   TenderFile   @relation(fields: [tenderFileId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([tenderFileId])
+  @@index([createdAt])
+}
+
+model TenderChunk {
+  id           String   @id @default(uuid())
+  orgId        String
+  tenderId     String
+  tenderFileId String
+  index        Int
+  content      String
+  contentHash  String
+  tokenCount   Int?
+  embedding    Unsupported("vector")?
+  createdAt    DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  file   TenderFile   @relation(fields: [tenderFileId], references: [id], onDelete: Cascade)
+
+  @@unique([tenderFileId, index])
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([tenderFileId])
+  @@index([createdAt])
+}
+
+model TenderInsight {
+  id           String   @id @default(uuid())
+  orgId        String
+  tenderId     String
+  tenderFileId String
+  kind         String
+  data         Json
+  createdAt    DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  file   TenderFile   @relation(fields: [tenderFileId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([tenderFileId])
+  @@index([kind])
+  @@index([createdAt])
+}
+
+
+model OrgBillingPolicy {
+  id                String   @id @default(uuid())
+  orgId             String   @unique
+  maxChatPerDay     Int      @default(200)
+  maxChatCost       Int      @default(30)
+  customMaxAiQueries Int?
+  customMaxWatchlist Int?
+  customMaxMembers   Int?
+  customExportsEnabled Boolean?
+  customWorkspaceEnabled Boolean?
+  customCompareEnabled Boolean?
+  customWhatsappEnabled Boolean?
+  customRiskEnabled Boolean?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model OrgBusinessProfile {
+  id        String   @id @default(uuid())
+  orgId     String   @unique
+
+  alertAutomationEnabled   Boolean @default(true)
+  alertDefaultChannels     String[] @default(["email"])
+  alertEscalationEnabled   Boolean @default(false)
+  alertEscalationMinutes   Int     @default(120)
+  alertEscalationChannels  String[] @default(["whatsapp"])
+
+  taskGovernanceEnabled            Boolean @default(true)
+  requireTaskOwner                 Boolean @default(true)
+  requireTaskDueDate               Boolean @default(true)
+  blockTaskCloseWithoutAssignee    Boolean @default(false)
+  blockTaskCloseWithoutDueDate     Boolean @default(false)
+
+  supportSlaHours Int @default(4)
+
+  onboardingAssistanceStatus String @default("NOT_REQUESTED")
+  onboardingAssistanceRequestedAt DateTime?
+  onboardingAssistanceNotes String?
+
+  accountManagerName  String?
+  accountManagerEmail String?
+  accountManagerNotes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceTemplate {
+  id          String @id @default(uuid())
+  orgId       String
+  name        String
+  description String?
+  isDefault   Boolean @default(false)
+  isArchived  Boolean @default(false)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tasks WorkspaceTemplateTask[]
+
+  @@index([orgId])
+  @@index([isArchived])
+  @@index([updatedAt])
+}
+
+model WorkspaceTemplateTask {
+  id          String @id @default(uuid())
+  templateId  String
+  title       String
+  description String?
+  priority    String @default("MEDIUM")
+  tags        String[] @default([])
+  dueInDays   Int?
+  sortOrder   Int @default(0)
+  createdAt   DateTime @default(now())
+
+  template WorkspaceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([sortOrder])
+}
+
+model OrgIntegrationEndpoint {
+  id          String @id @default(uuid())
+  orgId       String
+  name        String
+  type        String @default("webhook")
+  endpointUrl String
+  authType    String @default("none")
+  authToken   String?
+  isEnabled   Boolean @default(true)
+  subscribedEvents String[] @default([])
+  lastDeliveredAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([isEnabled])
+}
+
+model OrgSupportTicket {
+  id          String @id @default(uuid())
+  orgId       String
+  createdBy   String
+  subject     String
+  description String
+  priority    String @default("normal")
+  status      String @default("open")
+  resolutionNotes String?
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  orgId     String
+  createdBy String
+  title     String?
+  tenderId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, updatedAt])
+  @@index([tenderId])
+  @@index([createdAt])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  orgId          String
+  conversationId String
+  role           String
+  content        String
+  citations      Json?
+  tokenInput     Int?
+  tokenOutput    Int?
+  createdAt      DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([conversationId, createdAt])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  TENDER_SUMMARY_CREATED
+  CHAT_MESSAGE_CREATED
+  EXPORT_CREATED
+  TENDER_CHANGED
+  DEADLINE_CHANGED
+  ALERT_FIRED
+  PROCESSING_SKIPPED
+}
+
+model NotificationEvent {
+  id         String           @id @default(uuid())
+  orgId      String
+  type       NotificationType
+  entityType String?
+  entityId   String?
+  meta       Json?
+  createdAt  DateTime         @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([createdAt])
+}
+
+model TenderSummary {
+  id        String   @id @default(uuid())
+  orgId     String
+  tenderId  String
+  content   String
+  meta      Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([tenderId])
+}
+
+enum AlertEventType {
+  TENDER_CHANGED
+  DEADLINE_CHANGED
+  SUMMARY_CREATED
+}
+
+model AlertRule {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  isEnabled   Boolean  @default(true)
+  eventTypes  String[] @default([])
+  tenderId    String?
+  keywords    String[] @default([])
+  cooldownMin Int      @default(60)
+  lastFiredAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([isEnabled])
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model NotificationDelivery {
+  id             String         @id @default(uuid())
+  orgId          String
+  eventId        String
+  channel        String
+  to             String
+  status         DeliveryStatus @default(PENDING)
+  attempts       Int            @default(0)
+  lastError      String?
+  sentAt         DateTime?
+  idempotencyKey String?
+  lastAttemptAt  DateTime?
+  deferUntil     DateTime?
+  createdAt      DateTime       @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deferUntil])
+}
+
+enum PlanType {
+  TRIAL
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+model OrgSubscription {
+  orgId         String             @unique
+  plan          PlanType           @default(TRIAL)
+  status        SubscriptionStatus @default(TRIALING)
+
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+
+  seatsPurchased Int @default(1)
+  seatsUsed      Int @default(0)
+
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+
+  pastDueSince     DateTime?
+  graceEndsAt      DateTime?
+
+  experimentBucket String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([plan])
+  @@index([status])
+}
+
+model BillingEvent {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String?
+  name      String   // paywall_shown, upgrade_clicked, checkout_started, checkout_completed, portal_opened, ENTITLEMENT_WARNING
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([name])
+  @@index([createdAt])
+}
+
+model OrgInvoice {
+  id               String   @id @default(uuid())
+  orgId            String
+  stripeInvoiceId  String   @unique
+  status           String?
+  amountDue        Int?
+  amountPaid       Int?
+  currency         String?
+  hostedInvoiceUrl String?
+  invoicePdf       String?
+  createdAt        DateTime
+  periodStart      DateTime?
+  periodEnd        DateTime?
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([createdAt])
+}
+
+model OrgUsage {
+  id        String   @id @default(uuid())
+  orgId     String
+  month     String   // e.g. 2026-02
+  aiQueries Int      @default(0)
+  exports   Int      @default(0)
+  reminders Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, month])
+  @@index([orgId])
+}
+
+
+
+model WatchlistItem {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String
+  tenderId  String
+  templateId String
+  notes      String?
+  reminderTypes String[] @default([])
+  notificationChannels String[] @default(["email"])
+  createdAt DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenderId])
+  @@index([orgId])
+  @@index([userId])
+  @@index([tenderId])
+  @@index([templateId])
+}
+
+model UserNotificationPrefs {
+  id         String   @id @default(uuid())
+  orgId      String
+  userId     String
+  emailEnabled Boolean @default(true)
+  whatsappEnabled Boolean @default(false)
+  whatsappNumber String?
+  whatsappVerifiedAt DateTime?
+  eventTypes  String[] @default([])
+  quietStart  String?  // "22:00"
+  quietEnd    String?  // "06:00"
+  digestMode  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@index([orgId])
+  @@index([userId])
+}
+
+model TenderDeadline {
+  id        String   @id @default(uuid())
+  orgId     String
+  tenderId  String   @unique
+  closingAt DateTime?
+  briefingAt DateTime?
+  siteVisitAt DateTime?
+  contactEmail String?
+  contactPhone String?
+  confidence Float   @default(0)
+  citations  Json?
+  extractedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+enum TenderChangeType {
+  FILE_HASH_CHANGED
+  CHUNKS_CHANGED
+  DEADLINE_CHANGED
+  SUMMARY_CHANGED
+  LIFECYCLE_CHANGED
+}
+
+model TenderChangeLog {
+  id        String          @id @default(uuid())
+  orgId     String
+  tenderId  String
+  type      TenderChangeType
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenderId])
+  @@index([createdAt])
+}
+
+model Mention {
+  id         String   @id @default(uuid())
+  orgId      String
+  taskId     String
+  commentId  String
+  fromUserId String
+  toUserId   String
+  createdAt  DateTime @default(now())
+
+  org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  task     BidTask        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  comment  BidTaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  fromUser User           @relation("MentionFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User           @relation("MentionTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([taskId])
+  @@index([commentId])
+  @@index([toUserId])
+}
+
+model TaskReminderLog {
+  id        String           @id @default(uuid())
+  orgId     String
+  taskId    String
+  userId    String
+  type      TaskReminderType
+  fireAt    DateTime
+  firedAt   DateTime?
+  createdAt DateTime @default(now())
+
+  task BidTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([taskId])
+  @@index([userId])
+  @@index([fireAt])
+  @@index([firedAt])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model OrgInvite {
+  id        String @id @default(uuid())
+  orgId     String
+  email     String
+  role      Role   @default(MEMBER)
+  token     String @unique
+  status    InviteStatus @default(PENDING)
+  createdBy String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  acceptedAt DateTime?
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([email])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model OrgEntitlementWarning {
+  id        String   @id @default(uuid())
+  orgId     String
+  kind      String // AI_QUERIES_80, AI_QUERIES_100, SEATS_80, SEATS_100, EXPORT_LOCKED
+  meta      Json?
+  lastSentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, kind])
+  @@index([orgId])
+}
+
+model ExperimentAssignment {
+  id        String   @id @default(uuid())
+  orgId     String
+  key       String
+  bucket    String // A | B | C...
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, key])
+  @@index([key])
+}
+
+model ReferralCode {
+  id        String   @id @default(uuid())
+  orgId     String?
+  userId    String?
+  partnerId String?
+  code      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  org     Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  user    User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  partner Partner?      @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([partnerId])
+}
+
+model ReferralAttribution {
+  id        String   @id @default(uuid())
+  orgId     String
+  referralCodeId String?
+  code      String?
+  stripeCheckoutSessionId String?
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([code])
+}
+
+// ============================================================================
+// Revenue Sprint 4: In-App Billing, Referral Payouts, Segmentation, Onboarding
+// ============================================================================
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+model ReferralEarning {
+  id        String @id @default(uuid())
+  orgId     String
+  userId    String?
+  referralCodeId String?
+  attributedOrgId String?
+  stripeSubscriptionId String?
+  amountCents Int
+  currency  String @default("ZAR")
+  status    PayoutStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  approvedAt DateTime?
+  paidAt    DateTime?
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ReferralPayout {
+  id        String @id @default(uuid())
+  orgId     String
+  userId    String?
+  amountCents Int
+  currency  String @default("ZAR")
+  status    PayoutStatus @default(PENDING)
+  meta      Json?
+  createdAt DateTime @default(now())
+  paidAt    DateTime?
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([status])
+}
+
+model OrgSegmentSnapshot {
+  id        String @id @default(uuid())
+  orgId     String
+  day       String // YYYY-MM-DD
+  segment   String // e.g. TRIAL_ACTIVE_HIGH_INTENT, PRO_LOW_USAGE, PAST_DUE_GRACE
+  score     Int    @default(0)
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, day])
+  @@index([segment])
+  @@index([day])
+}
+
+model OnboardingChecklistItem {
+  id        String @id @default(uuid())
+  key       String @unique // FIRST_COMPARE, FIRST_WORKSPACE_TASK, FIRST_EXPORT, FIRST_RISK
+  title     String
+  description String
+  order     Int @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([order])
+}
+
+model OnboardingChecklistProgress {
+  id        String @id @default(uuid())
+  orgId     String
+  itemKey   String
+  completed Boolean @default(false)
+  completedAt DateTime?
+
+  @@unique([orgId, itemKey])
+  @@index([orgId])
+}
+
+// ============================================================================
+// Revenue Sprint 5: Partner Tiers, Payout Automation, Advanced Targeting,
+//                   Usage-Spike Offers, Revenue Reporting
+// ============================================================================
+
+model ExperimentConfig {
+  id        String @id @default(uuid())
+  key       String @unique
+  enabled   Boolean @default(true)
+  config    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PartnerTier {
+  id                        String    @id @default(uuid())
+  name                      String    @unique
+  revenueSharePercent      Int       @default(10)
+  minMonthlyAttributedCents Int       @default(0)
+  createdAt                 DateTime  @default(now())
+  partners                  Partner[]
+}
+
+model Partner {
+  id        String       @id @default(uuid())
+  name      String
+  email     String?
+  tierId    String?
+  tier      PartnerTier? @relation(fields: [tierId], references: [id])
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+
+  referralCodes ReferralCode[]
+
+  @@index([tierId])
+}
+
+model PartnerAttribution {
+  id                   String   @id @default(uuid())
+  partnerId            String
+  orgId                String
+  stripeSubscriptionId String?
+  amountCents          Int? // optional, filled from invoice or estimate
+  createdAt            DateTime @default(now())
+
+  @@index([partnerId])
+  @@index([orgId])
+}
+
+enum PayoutBatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum PayoutAttemptStatus {
+  PENDING
+  SENT
+  CONFIRMED
+  FAILED
+}
+
+model PayoutBatch {
+  id          String            @id @default(uuid())
+  provider    String
+  status      PayoutBatchStatus @default(PENDING)
+  totalCents  Int               @default(0)
+  currency    String            @default("ZAR")
+  meta        Json?
+  createdAt   DateTime          @default(now())
+  processedAt DateTime?
+  attempts    PayoutAttempt[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PayoutAttempt {
+  id          String              @id @default(uuid())
+  batchId     String
+  batch       PayoutBatch         @relation(fields: [batchId], references: [id])
+  earningId   String
+  providerRef String?
+  status      PayoutAttemptStatus @default(PENDING)
+  error       String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([batchId])
+  @@index([earningId])
+  @@index([status])
+}
+
+enum OfferStatus {
+  ACTIVE
+  EXPIRED
+  ACCEPTED
+  DISMISSED
+}
+
+model UpgradeOffer {
+  id          String      @id @default(uuid())
+  orgId       String
+  key         String // SPIKE_AI, SPIKE_PAYWALL, SPIKE_EXPORTS
+  title       String
+  description String
+  ctaLabel    String
+  meta        Json?
+  status      OfferStatus @default(ACTIVE)
+  expiresAt   DateTime
+  createdAt   DateTime    @default(now())
+  events      OfferEvent[]
+
+  @@index([orgId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model OfferEvent {
+  id        String   @id @default(uuid())
+  offerId   String
+  offer     UpgradeOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  orgId     String
+  name      String // impression, click, accept, dismiss
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([offerId])
+  @@index([orgId])
+  @@index([name])
+}
+
+model SystemSettings {
+  id                String   @id @default("singleton")
+  retentionDays     Int      @default(30)
+  hideClosedTenders Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+}

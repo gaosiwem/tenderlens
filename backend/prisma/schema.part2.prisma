@@ -1,0 +1,284 @@
+  orgId         String   @unique
+  plan          PlanType @default(FREE)
+  status        SubscriptionStatus @default(TRIALING)
+
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+
+  seatsPurchased Int @default(1)
+  seatsUsed      Int @default(0)
+
+  trialEndsAt DateTime?
+  currentPeriodEnd DateTime?
+
+  pastDueSince DateTime?
+  graceEndsAt  DateTime?
+  
+  experimentBucket String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([plan])
+  @@index([status])
+}
+
+model BillingEvent {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String?
+  name      String   // paywall_shown, upgrade_clicked, checkout_started, checkout_completed, portal_opened, ENTITLEMENT_WARNING
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([name])
+  @@index([createdAt])
+}
+
+model OrgInvoice {
+  id               String   @id @default(uuid())
+  orgId            String
+  stripeInvoiceId  String   @unique
+  status           String?
+  amountDue        Int?
+  amountPaid       Int?
+  currency         String?
+  hostedInvoiceUrl String?
+  invoicePdf       String?
+  createdAt        DateTime
+  periodStart      DateTime?
+  periodEnd        DateTime?
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([createdAt])
+}
+
+model OrgUsage {
+  id        String   @id @default(uuid())
+  orgId     String
+  month     String   // e.g. 2026-02
+  aiQueries Int      @default(0)
+  exports   Int      @default(0)
+  reminders Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, month])
+  @@index([orgId])
+}
+
+
+
+model WatchlistItem {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String
+  tenderId  String
+  createdAt DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenderId])
+  @@index([orgId])
+  @@index([userId])
+  @@index([tenderId])
+}
+
+model UserNotificationPrefs {
+  id         String   @id @default(uuid())
+  orgId      String
+  userId     String   @unique
+  emailEnabled Boolean @default(true)
+  whatsappEnabled Boolean @default(false)
+  whatsappNumber String?
+  whatsappVerifiedAt DateTime?
+  eventTypes  String[] @default([])
+  quietStart  String?  // "22:00"
+  quietEnd    String?  // "06:00"
+  digestMode  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+model TenderDeadline {
+  id        String   @id @default(uuid())
+  orgId     String
+  tenderId  String   @unique
+  closingAt DateTime?
+  briefingAt DateTime?
+  siteVisitAt DateTime?
+  contactEmail String?
+  contactPhone String?
+  confidence Float   @default(0)
+  citations  Json?
+  extractedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+enum TenderChangeType {
+  FILE_HASH_CHANGED
+  CHUNKS_CHANGED
+  DEADLINE_CHANGED
+  SUMMARY_CHANGED
+}
+
+model TenderChangeLog {
+  id        String          @id @default(uuid())
+  orgId     String
+  tenderId  String
+  type      TenderChangeType
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenderId])
+  @@index([createdAt])
+}
+
+model Mention {
+  id         String   @id @default(uuid())
+  orgId      String
+  taskId     String
+  commentId  String
+  fromUserId String
+  toUserId   String
+  createdAt  DateTime @default(now())
+
+  org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  task     BidTask        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  comment  BidTaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  fromUser User           @relation("MentionFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User           @relation("MentionTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([taskId])
+  @@index([commentId])
+  @@index([toUserId])
+}
+
+model TaskReminderLog {
+  id        String           @id @default(uuid())
+  orgId     String
+  taskId    String
+  userId    String
+  type      TaskReminderType
+  fireAt    DateTime
+  firedAt   DateTime?
+  createdAt DateTime @default(now())
+
+  task BidTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([taskId])
+  @@index([userId])
+  @@index([fireAt])
+  @@index([firedAt])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model OrgInvite {
+  id        String @id @default(uuid())
+  orgId     String
+  email     String
+  role      Role   @default(MEMBER)
+  token     String @unique
+  status    InviteStatus @default(PENDING)
+  createdBy String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  acceptedAt DateTime?
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([email])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model OrgEntitlementWarning {
+  id        String   @id @default(uuid())
+  orgId     String
+  kind      String // AI_QUERIES_80, AI_QUERIES_100, SEATS_80, SEATS_100, EXPORT_LOCKED
+  meta      Json?
+  lastSentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, kind])
+  @@index([orgId])
+}
+
+model ExperimentAssignment {
+  id        String   @id @default(uuid())
+  orgId     String
+  key       String
+  bucket    String // A | B | C...
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, key])
+  @@index([key])
+}
+
+model ReferralCode {
+  id        String   @id @default(uuid())
+  orgId     String?
+  userId    String?
+  code      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  org Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([userId])
+}
+
+model ReferralAttribution {
+  id        String   @id @default(uuid())
+  orgId     String
+  referralCodeId String?
+  code      String?
+  stripeCheckoutSessionId String?
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([code])
+}

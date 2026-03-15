@@ -1,0 +1,63 @@
+openapi: 3.0.3
+info:
+  title: TenderLens API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /health:
+    get:
+      responses:
+        "200":
+          description: OK
+  /ready:
+    get:
+      responses:
+        "200":
+          description: Ready
+        "503":
+          description: Not ready
+  /api/v1/auth/register:
+    post:
+      responses:
+        "200":
+          description: Register
+  /api/v1/auth/login:
+    post:
+      responses:
+        "200":
+          description: Login
+  /api/v1/auth/logout:
+    post:
+      responses:
+        "200":
+          description: Logout
+  /api/v1/auth/refresh:
+    post:
+      responses:
+        "200":
+          description: Refresh
+  /api/v1/auth/request-password-reset:
+    post:
+      responses:
+        "200":
+          description: Request reset
+  /api/v1/auth/reset-password:
+    post:
+      responses:
+        "200":
+          description: Reset password
+  /api/v1/me:
+    get:
+      responses:
+        "200":
+          description: Me
+  /api/v1/orgs:
+    get:
+      responses:
+        "200":
+          description: List orgs
+    post:
+      responses:
+        "200":
+          description: Create org

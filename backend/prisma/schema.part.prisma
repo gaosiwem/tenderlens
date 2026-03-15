@@ -1,0 +1,86 @@
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model OrgInvite {
+  id        String @id @default(uuid())
+  orgId     String
+  email     String
+  role      Role   @default(MEMBER)
+  token     String @unique
+  status    InviteStatus @default(PENDING)
+  createdBy String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  acceptedAt DateTime?
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([email])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model OrgEntitlementWarning {
+  id        String   @id @default(uuid())
+  orgId     String
+  kind      String // AI_QUERIES_80, AI_QUERIES_100, SEATS_80, SEATS_100, EXPORT_LOCKED
+  meta      Json?
+  lastSentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, kind])
+  @@index([orgId])
+}
+
+model ExperimentAssignment {
+  id        String   @id @default(uuid())
+  orgId     String
+  key       String
+  bucket    String // A | B | C...
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, key])
+  @@index([key])
+}
+
+model ReferralCode {
+  id        String   @id @default(uuid())
+  orgId     String?
+  userId    String?
+  code      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  org Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([userId])
+}
+
+model ReferralAttribution {
+  id        String   @id @default(uuid())
+  orgId     String
+  referralCodeId String?
+  code      String?
+  stripeCheckoutSessionId String?
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([code])
+}

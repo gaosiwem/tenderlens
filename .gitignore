@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Private/Internal Directories (User Exclusions)
+.agent/
+Design/
+Sprints/
+
+# Logs and MD (User Exclusions)
+**/*.log
+**/*.md
+
+# Environment and Secrets
+.env
+.env*
+!.env.example
+secrets.txt
+secrets_clean.txt
+
+# Temporary/Tool outputs
+backend/storage/
+backend/media/
+frontend/.next/
+prisma_err_*.txt
+test_output_*.txt
+prisma_status*.txt
+prisma_out.txt
+tmp_*
+.tmp-*
+
+# OS files
+.DS_Store
+Thumbs.db
