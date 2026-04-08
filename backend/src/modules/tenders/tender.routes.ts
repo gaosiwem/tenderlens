@@ -9,7 +9,10 @@ import {
   requireSystemAdmin,
 } from "../../middleware/rbac.middleware"
 import { ok, AppError } from "../../utils/responses"
-import { requireTenderLifecycleAccess } from "../../billing/plan.middleware"
+import {
+  requireTenderLifecycleAccess,
+  requireTenderReadOnlyLifecycleAccess,
+} from "../../billing/plan.middleware"
 import { auditLog } from "../audit/audit.service"
 import {
   listTenders,
@@ -74,6 +77,22 @@ async function enforceLifecycleAccessForTender(args: {
   await requireTenderLifecycleAccess(args.orgId, lifecycle)
 }
 
+async function enforceReadOnlyLifecycleAccessForTender(args: {
+  orgId?: string | null
+  tenderId: string
+}) {
+  if (!args.orgId) return
+  const scraped = await getScrapedTenderDataForTender({
+    orgId: args.orgId,
+    tenderId: args.tenderId,
+  })
+  const lifecycle = inferLifecycleForAccess({
+    status: scraped.status,
+    closingDate: scraped.closingDate,
+  })
+  await requireTenderReadOnlyLifecycleAccess(args.orgId, lifecycle)
+}
+
 tenderRouter.get("/", requireAuth, requireOrgMembership, async (req, res, next) => {
   try {
     const page = Number(req.query.page ?? "1")
@@ -83,7 +102,7 @@ tenderRouter.get("/", requireAuth, requireOrgMembership, async (req, res, next) 
     const dir = String(req.query.dir ?? "desc")
     const includeHistorical = String(req.query.includeHistorical ?? "false")
     const lifecycle = String(req.query.lifecycle ?? "open")
-    await requireTenderLifecycleAccess(req.orgId!, lifecycle)
+    await requireTenderReadOnlyLifecycleAccess(req.orgId!, lifecycle)
     const out = await listTenders({
       orgId: req.orgId!,
       page,
@@ -106,7 +125,7 @@ tenderRouter.get(
   requireOrgMembership,
   async (req, res, next) => {
     try {
-      await enforceLifecycleAccessForTender({
+      await enforceReadOnlyLifecycleAccessForTender({
         orgId: req.orgId,
         tenderId: req.params.tenderId,
       })
@@ -135,7 +154,7 @@ tenderRouter.get(
         status: data.status,
         closingDate: data.closingDate,
       })
-      await requireTenderLifecycleAccess(req.orgId!, lifecycle)
+      await requireTenderReadOnlyLifecycleAccess(req.orgId!, lifecycle)
       res.json(ok(data))
     } catch (e) {
       next(e)
@@ -149,7 +168,7 @@ tenderRouter.get(
   requireOrgMembership,
   async (req, res, next) => {
     try {
-      await enforceLifecycleAccessForTender({
+      await enforceReadOnlyLifecycleAccessForTender({
         orgId: req.orgId,
         tenderId: req.params.tenderId,
       })
@@ -170,7 +189,7 @@ tenderRouter.get(
   requireOrgMembership,
   async (req, res, next) => {
     try {
-      await enforceLifecycleAccessForTender({
+      await enforceReadOnlyLifecycleAccessForTender({
         orgId: req.orgId,
         tenderId: req.params.tenderId,
       })
@@ -192,7 +211,7 @@ tenderRouter.get(
   requireOrgMembership,
   async (req, res, next) => {
     try {
-      await enforceLifecycleAccessForTender({
+      await enforceReadOnlyLifecycleAccessForTender({
         orgId: req.orgId,
         tenderId: req.params.tenderId,
       })
@@ -223,7 +242,7 @@ tenderRouter.get(
   requireOrgMembership,
   async (req, res, next) => {
     try {
-      await enforceLifecycleAccessForTender({
+      await enforceReadOnlyLifecycleAccessForTender({
         orgId: req.orgId,
         tenderId: req.params.tenderId,
       })
@@ -248,7 +267,7 @@ tenderRouter.get(
       const tenderId = req.params.tenderId
       const fileId = req.params.fileId
 
-      await enforceLifecycleAccessForTender({
+      await enforceReadOnlyLifecycleAccessForTender({
         orgId,
         tenderId,
       })
@@ -299,7 +318,7 @@ tenderRouter.get(
   requireOrgMembership,
   async (req, res, next) => {
     try {
-      await enforceLifecycleAccessForTender({
+      await enforceReadOnlyLifecycleAccessForTender({
         orgId: req.orgId,
         tenderId: req.params.tenderId,
       })
@@ -320,7 +339,7 @@ tenderRouter.get(
   requireOrgMembership,
   async (req, res, next) => {
     try {
-      await enforceLifecycleAccessForTender({
+      await enforceReadOnlyLifecycleAccessForTender({
         orgId: req.orgId,
         tenderId: req.params.tenderId,
       })

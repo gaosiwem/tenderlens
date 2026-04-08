@@ -336,4 +336,85 @@ describe("tenders integration", () => {
     expect(res.body.data.stats.buyerTenderCount).toBe(1)
     expect(res.body.data.similarTenders).toEqual([])
   })
+
+  it("keeps tender history readable after expiry but blocks mutations", async () => {
+    const expiredUser = await prisma.user.create({
+      data: {
+        email: `expired-history-${Date.now()}@example.com`,
+        passwordHash: "hash",
+      },
+    })
+
+    const expiredOrg = await prisma.organization.create({
+      data: {
+        name: "Expired History Org",
+        slug: `expired-history-org-${Date.now()}`,
+      },
+    })
+
+    await prisma.membership.create({
+      data: {
+        userId: expiredUser.id,
+        orgId: expiredOrg.id,
+        role: "ADMIN",
+      },
+    })
+
+    await prisma.orgSubscription.create({
+      data: {
+        orgId: expiredOrg.id,
+        plan: "TRIAL",
+        status: "EXPIRED",
+        trialEndsAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      },
+    })
+
+    const expiredTender = await prisma.tender.create({
+      data: {
+        orgId: expiredOrg.id,
+        createdByUserId: expiredUser.id,
+        title: "Expired Awarded Tender",
+        source: `etenders:${Date.now()}:expired-awarded`,
+        status: "DRAFT",
+        companyName: "Expired Municipality",
+        category: "Infrastructure",
+        closingDate: "2026-03-01",
+        scrapedStatus: "Awarded",
+      },
+    })
+
+    const expiredToken = signAccessToken(expiredUser.id)
+
+    const listRes = await request(app)
+      .get("/api/v1/tenders?lifecycle=awarded")
+      .set("Authorization", `Bearer ${expiredToken}`)
+      .set("x-org-id", expiredOrg.id)
+
+    expect(listRes.status).toBe(200)
+    expect(
+      listRes.body.data.items.some(
+        (item: { id: string }) => item.id === expiredTender.id,
+      ),
+    ).toBe(true)
+
+    const detailRes = await request(app)
+      .get(`/api/v1/tenders/${expiredTender.id}`)
+      .set("Authorization", `Bearer ${expiredToken}`)
+      .set("x-org-id", expiredOrg.id)
+
+    expect(detailRes.status).toBe(200)
+    expect(detailRes.body.data.id).toBe(expiredTender.id)
+
+    const uploadRes = await request(app)
+      .post(`/api/v1/tenders/${expiredTender.id}/files`)
+      .set("Authorization", `Bearer ${expiredToken}`)
+      .set("x-org-id", expiredOrg.id)
+      .attach("file", Buffer.from("blocked upload"), {
+        filename: "blocked.txt",
+        contentType: "text/plain",
+      })
+
+    expect(uploadRes.status).toBe(403)
+    expect(uploadRes.body?.error?.code).toBe("PLAN_EXPIRED")
+  })
 })

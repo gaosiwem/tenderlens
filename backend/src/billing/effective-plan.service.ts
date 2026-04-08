@@ -1,5 +1,10 @@
 import { prisma } from "../db/prisma"
-import { PLAN_CONFIG, type PlanConfig } from "./plan"
+import {
+  EXPIRED_READONLY_PLAN_CONFIG,
+  PLAN_CONFIG,
+  type PlanConfig,
+} from "./plan"
+import { ensureAccountTrialState } from "./accountTrial.service"
 
 function clonePlanConfig(config: PlanConfig): PlanConfig {
   return {
@@ -73,18 +78,28 @@ export async function getEffectivePlanConfig(orgId: string) {
     where: { orgId },
   })
 
-  // If no subscription, create one in TRIALING status (14 days)
+  // If a subscription is missing, inherit the account-level trial window from
+  // the earliest owner instead of minting a fresh org-level trial.
   if (!sub) {
-    const trialDays = 14
-    const trialEndsAt = new Date()
-    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays)
+    const owner = await prisma.membership.findFirst({
+      where: { orgId, role: "OWNER" },
+      orderBy: { createdAt: "asc" },
+      select: { userId: true },
+    })
+
+    const accountTrial = owner
+      ? await ensureAccountTrialState(owner.userId)
+      : {
+          status: "EXPIRED" as const,
+          trialEndsAt: new Date(),
+        }
 
     sub = await prisma.orgSubscription.create({
       data: {
         orgId,
-        plan: "PRO", // Trial counts as PRO features
-        status: "TRIALING",
-        trialEndsAt,
+        plan: "TRIAL",
+        status: accountTrial.status,
+        trialEndsAt: accountTrial.trialEndsAt,
       },
     })
   }
@@ -98,6 +113,14 @@ export async function getEffectivePlanConfig(orgId: string) {
   }
 
   const baseConfig = PLAN_CONFIG[planKey] ?? (PLAN_CONFIG as any).TRIAL ?? PLAN_CONFIG.PRO
+
+  if (sub.status === "EXPIRED") {
+    return {
+      subscription: sub,
+      config: clonePlanConfig(EXPIRED_READONLY_PLAN_CONFIG),
+      policy: null,
+    }
+  }
 
   if (!isBusinessPlan(sub.plan) && sub.status !== "TRIALING") {
     return {

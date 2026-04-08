@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/date-utils";
 import { apiFetch } from "@/lib/api";
+import { useBilling } from "@/hooks/use-billing";
 import type {
   Tender,
   ScrapedTenderData,
@@ -60,6 +61,8 @@ function actionIcon(action: OutcomeInsightAction) {
 }
 
 export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
+  const { subscription } = useBilling();
+  const isExpiredReadOnly = subscription?.status === "EXPIRED";
   const [loading, setLoading] = React.useState(true);
   const [tender, setTender] = React.useState<Tender | null>(null);
   const [scraped, setScraped] = React.useState<ScrapedTenderData | null>(null);
@@ -128,6 +131,11 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
   const showDatePrecisionNote =
     insights?.lifecycle === "awarded" &&
     insights.lifecycleDateSource === "import_detected_at";
+  const recommendedActions = (insights?.recommendedActions ?? []).filter(
+    (action) =>
+      !isExpiredReadOnly ||
+      (action.kind !== "open_compare" && action.kind !== "open_workspace"),
+  );
 
   return (
     <TenderLensAppShell
@@ -145,6 +153,15 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
         </div>
       }
     >
+      {isExpiredReadOnly ? (
+        <TLSection>
+          <TLInlineAlert
+            title="Read-only history mode"
+            description="Your trial has expired. You can still review tender outcomes and documents, but compare and workspace actions are disabled."
+          />
+        </TLSection>
+      ) : null}
+
       {insights ? (
         <TLSection>
           <TLInlineAlert
@@ -244,7 +261,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                     Recommended Actions
                   </div>
                   <div className="mt-3 grid gap-3">
-                    {insights.recommendedActions.map((action) => (
+                    {recommendedActions.map((action) => (
                       <Link key={action.kind} href={action.href}>
                         <div className="rounded-xl border border-border bg-background px-4 py-3 transition-colors hover:bg-muted/30">
                           <div className="flex items-start gap-3">

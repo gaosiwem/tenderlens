@@ -16,6 +16,39 @@ async function registerAndLogin(email: string) {
 }
 
 describe("orgs tenant isolation and rbac", () => {
+  it("does not grant a fresh org trial when the account trial has already expired", async () => {
+    const email = `expired-owner-${Date.now()}@ex.com`
+    const owner = await registerAndLogin(email)
+
+    const expiredTrialStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const expiredTrialEnd = new Date(
+      expiredTrialStart.getTime() + 14 * 24 * 60 * 60 * 1000,
+    )
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        trialStartedAt: expiredTrialStart,
+        trialEndsAt: expiredTrialEnd,
+      },
+    })
+
+    const orgRes = await request(app)
+      .post("/api/v1/orgs")
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ name: "Expired Account Org" })
+
+    expect(orgRes.status).toBe(200)
+
+    const sub = await prisma.orgSubscription.findUnique({
+      where: { orgId: orgRes.body.data.id as string },
+    })
+
+    expect(sub?.plan).toBe("TRIAL")
+    expect(sub?.status).toBe("EXPIRED")
+    expect(sub?.trialEndsAt?.toISOString()).toBe(expiredTrialEnd.toISOString())
+  })
+
   it("prevents non-member from accessing org members", async () => {
     const a = await registerAndLogin(`a_${Date.now()}@ex.com`)
     const b = await registerAndLogin(`b_${Date.now()}@ex.com`)

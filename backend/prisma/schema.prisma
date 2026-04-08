@@ -24,6 +24,8 @@ model User {
   avatarUrl      String?
   name           String?
   isActive       Boolean         @default(true)
+  trialStartedAt DateTime?
+  trialEndsAt    DateTime?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   memberships    Membership[]

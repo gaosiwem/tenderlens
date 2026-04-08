@@ -3,6 +3,7 @@ import { AppError } from "../../utils/responses"
 import { slugify } from "../../utils/slug"
 import { Role } from "@prisma/client"
 import { refreshSeatsUsed } from "../../billing/seats.service"
+import { ensureAccountTrialState } from "../../billing/accountTrial.service"
 
 export async function listUserOrgs(userId: string) {
   const memberships = await prisma.membership.findMany({
@@ -36,13 +37,15 @@ export async function createOrg(userId: string, name: string) {
     data: { userId, orgId: org.id, role: Role.OWNER },
   })
 
-  // Revenue Sprint 1: Initialize subscription with 14-day trial
+  const accountTrial = await ensureAccountTrialState(userId)
+
+  // Trial access is account-scoped, so new orgs inherit the user's existing window.
   await prisma.orgSubscription.create({
     data: {
       orgId: org.id,
       plan: "TRIAL" as any,
-      status: "TRIALING",
-      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      status: accountTrial.status,
+      trialEndsAt: accountTrial.trialEndsAt,
       seatsUsed: 1,
     },
   })

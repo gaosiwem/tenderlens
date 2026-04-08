@@ -19,6 +19,7 @@ import {
 } from "../notifications/auth-email.builder"
 import { OAuth2Client } from "google-auth-library"
 import { logger } from "../../utils/logger"
+import { syncOwnerTrialSubscriptions } from "../../billing/accountTrial.service"
 
 const googleClient = new OAuth2Client()
 
@@ -127,37 +128,7 @@ async function createPersonalOrgForUser(userId: string, nameOrEmail: string) {
 }
 
 async function startPendingTrialForUser(userId: string) {
-  const pendingMemberships = await prisma.membership.findMany({
-    where: { userId, role: "OWNER" },
-    select: { orgId: true },
-  })
-
-  if (pendingMemberships.length === 0) return
-
-  await prisma.orgSubscription.createMany({
-    data: pendingMemberships.map((membership) => ({
-      orgId: membership.orgId,
-      plan: "TRIAL",
-      status: "ACTIVE",
-      trialEndsAt: null,
-    })),
-    skipDuplicates: true,
-  })
-
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-
-  await prisma.orgSubscription.updateMany({
-    where: {
-      orgId: { in: pendingMemberships.map((membership) => membership.orgId) },
-      plan: "TRIAL",
-      status: "ACTIVE",
-      trialEndsAt: null,
-    },
-    data: {
-      status: "TRIALING",
-      trialEndsAt,
-    },
-  })
+  await syncOwnerTrialSubscriptions(userId)
 }
 
 export async function registerUser(input: {

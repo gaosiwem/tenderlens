@@ -1,4 +1,8 @@
-import { PLAN_CONFIG, type TenderLifecycleAccess } from "./plan"
+import {
+  ALL_TENDER_LIFECYCLES,
+  PLAN_CONFIG,
+  type TenderLifecycleAccess,
+} from "./plan"
 import { AppError } from "../utils/responses"
 import { prisma } from "../db/prisma"
 import { getEffectivePlanConfig, isBusinessPlan } from "./effective-plan.service"
@@ -45,6 +49,32 @@ async function resolveActivePlanConfig(orgId: string) {
   }
 
   return { sub, config }
+}
+
+async function resolveTenderHistoryConfig(orgId: string) {
+  const { subscription: sub, config } = await getEffectivePlanConfig(orgId)
+
+  if (!sub) throw new AppError("PLAN_REQUIRED", "Subscription required", 403)
+
+  if (sub.status === "PAST_DUE") {
+    const isGraceEnded = sub.graceEndsAt && new Date() > sub.graceEndsAt
+    if (isGraceEnded) {
+      throw new AppError(
+        "PLAN_PAST_DUE",
+        "Subscription past due and grace period ended",
+        403,
+        { upgrade: true },
+      )
+    }
+  }
+
+  return {
+    sub,
+    allowedLifecycles:
+      sub.status === "EXPIRED"
+        ? ALL_TENDER_LIFECYCLES
+        : config.tenderLifecycleAccess,
+  }
 }
 
 export async function requirePlanFeature(
@@ -105,6 +135,60 @@ export async function requireTenderLifecycleAccess(
       allowedLifecycles: config.tenderLifecycleAccess,
     },
   )
+}
+
+export async function requireTenderReadOnlyLifecycleAccess(
+  orgId: string,
+  lifecycle?: string | null,
+) {
+  const { allowedLifecycles } = await resolveTenderHistoryConfig(orgId)
+  const requested = normalizeRequestedLifecycle(lifecycle)
+  const required =
+    requested === "all"
+      ? (["open", "awarded", "closed", "cancelled"] as TenderLifecycleAccess[])
+      : [requested]
+
+  const allowed = new Set(allowedLifecycles)
+  const blocked = required.filter((item) => !allowed.has(item))
+  if (blocked.length === 0) return
+
+  throw new AppError(
+    "PLAN_UPGRADE_REQUIRED",
+    `Your plan does not include ${blocked.join(", ")} tenders.`,
+    403,
+    {
+      upgrade: true,
+      limitType: "tender_lifecycle",
+      requestedLifecycle: requested,
+      allowedLifecycles,
+    },
+  )
+}
+
+export async function enforceBillingWriteAccess(orgId: string) {
+  const sub = await prisma.orgSubscription.findUnique({ where: { orgId } })
+  if (!sub) return
+
+  if (sub.status === "EXPIRED") {
+    throw new AppError(
+      "PLAN_EXPIRED",
+      "Subscription expired. Read-only access only.",
+      403,
+      { upgrade: true },
+    )
+  }
+
+  if (sub.status === "PAST_DUE") {
+    const isGraceEnded = sub.graceEndsAt && new Date() > sub.graceEndsAt
+    if (isGraceEnded) {
+      throw new AppError(
+        "PLAN_PAST_DUE",
+        "Subscription past due and grace period ended",
+        403,
+        { upgrade: true },
+      )
+    }
+  }
 }
 
 export async function enforceTrial(orgId: string) {

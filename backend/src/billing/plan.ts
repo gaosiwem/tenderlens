@@ -21,6 +21,13 @@ export type PlanConfig = {
   customAlertRules: boolean
 }
 
+export const ALL_TENDER_LIFECYCLES: TenderLifecycleAccess[] = [
+  "open",
+  "awarded",
+  "closed",
+  "cancelled",
+]
+
 export const PLAN_CONFIG: Record<PlanType, PlanConfig> = {
   TRIAL: {
     monthlyPriceCents: 0,
@@ -64,4 +71,19 @@ export const PLAN_CONFIG: Record<PlanType, PlanConfig> = {
     emailAlerts: "advanced",
     customAlertRules: true,
   },
+}
+
+export const EXPIRED_READONLY_PLAN_CONFIG: PlanConfig = {
+  monthlyPriceCents: 0,
+  maxWatchlist: 0,
+  maxAiQueries: 0,
+  workspace: false,
+  compare: false,
+  exports: false,
+  whatsapp: false,
+  risk: false,
+  maxMembers: 0,
+  tenderLifecycleAccess: [...ALL_TENDER_LIFECYCLES],
+  emailAlerts: "basic",
+  customAlertRules: false,
 }

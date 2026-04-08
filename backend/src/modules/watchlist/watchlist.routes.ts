@@ -4,6 +4,7 @@ import { requireAuth } from "../../middleware/auth.middleware"
 import { requireOrgMembership } from "../../middleware/tenant.middleware"
 import { requireRole } from "../../middleware/rbac.middleware"
 import { AppError, ok } from "../../utils/responses"
+import { enforceBillingWriteAccess } from "../../billing/plan.middleware"
 import {
   addToWatchlist,
   removeFromWatchlist,
@@ -65,6 +66,7 @@ watchlistRouter.post(
   requireRole("VIEWER"),
   async (req, res, next) => {
     try {
+      await enforceBillingWriteAccess(req.orgId!)
       const tenderId = String(req.params.tenderId)
       const body = addWatchSchema.parse(req.body ?? {})
       const out = await addToWatchlist({
@@ -92,6 +94,7 @@ watchlistRouter.delete(
   requireRole("VIEWER"),
   async (req, res, next) => {
     try {
+      await enforceBillingWriteAccess(req.orgId!)
       const tenderId = String(req.params.tenderId)
       const out = await removeFromWatchlist({
         orgId: req.orgId!,
@@ -116,6 +119,7 @@ watchlistRouter.post(
   requireRole("VIEWER"),
   async (req, res, next) => {
     try {
+      await enforceBillingWriteAccess(req.orgId!)
       const body = bulkRemoveSchema.parse(req.body ?? {})
       const out = await bulkRemoveFromWatchlist({
         orgId: req.orgId!,
@@ -154,6 +158,7 @@ watchlistRouter.patch(
   requireRole("VIEWER"),
   async (req, res, next) => {
     try {
+      await enforceBillingWriteAccess(req.orgId!)
       const tenderId = String(req.params.tenderId)
       const body = updateNotesSchema.parse(req.body ?? {})
       const out = await updateWatchlistItem({

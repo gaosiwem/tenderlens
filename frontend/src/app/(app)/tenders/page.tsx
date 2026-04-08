@@ -9,6 +9,7 @@ import { TLSection } from "@/components/tenderlens/section";
 import { TLButton } from "@/components/tenderlens/button";
 import { TLTableShell } from "@/components/tenderlens/table-shell";
 import { useAuth } from "@/lib/auth";
+import { useBilling } from "@/hooks/use-billing";
 import { TLEmptyState } from "@/components/tenderlens/empty-state";
 import {
   Table,
@@ -110,6 +111,8 @@ export default function TendersPage() {
   const [page, setPage] = React.useState(initialPage);
   const [pageSize, setPageSize] = React.useState(initialPageSize);
   const { isReady } = useAuth();
+  const { subscription } = useBilling();
+  const isExpiredReadOnly = subscription?.status === "EXPIRED";
 
   // Helper to sync state to URL
   const syncToUrl = React.useCallback(
@@ -233,7 +236,8 @@ export default function TendersPage() {
   const pageStart = totalItems === 0 ? 0 : (page - 1) * pageSize;
   const pageItems = tenders;
   const showAmountColumn = lifecycle === "awarded";
-  const showChatColumn = lifecycle === "open" || lifecycle === "all";
+  const showChatColumn =
+    (lifecycle === "open" || lifecycle === "all") && !isExpiredReadOnly;
   const getTenderDetailHref = React.useCallback(
     (t: TenderListItem) => {
       // Respect the explicit lifecycle filter from the current page first.
@@ -278,6 +282,12 @@ export default function TendersPage() {
     >
       <TLSection>
         <TLTableShell title="All Tenders">
+          {isExpiredReadOnly ? (
+            <div className="border-b px-4 py-3 text-sm text-muted-foreground">
+              Your trial has expired. Tender history remains available in
+              read-only mode, but interactive features are disabled.
+            </div>
+          ) : null}
           {!loading && tenders.length === 0 ? (
             <div className="p-6">
               <TLEmptyState

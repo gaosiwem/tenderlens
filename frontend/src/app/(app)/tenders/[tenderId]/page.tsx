@@ -40,11 +40,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/date-utils";
+import { useBilling } from "@/hooks/use-billing";
 
 export default function TenderDetailPage() {
   const params = useParams();
   const tenderId = params.tenderId as string;
   const { me } = useAuth();
+  const { subscription } = useBilling();
   const activeOrgId =
     typeof window !== "undefined"
       ? window.localStorage.getItem("tl_active_org_id")
@@ -52,6 +54,7 @@ export default function TenderDetailPage() {
   const userRole =
     me?.orgs.find((o) => o.org.id === activeOrgId)?.role ?? "VIEWER";
   const canWriteChat = userRole !== "VIEWER";
+  const isExpiredReadOnly = subscription?.status === "EXPIRED";
 
   const [tender, setTender] = React.useState<Tender | null>(null);
   const [files, setFiles] = React.useState<TenderFile[]>([]);
@@ -142,6 +145,14 @@ export default function TenderDetailPage() {
   }, [tender, fetchData]);
 
   const loadTenderChat = React.useCallback(async () => {
+    if (isExpiredReadOnly) {
+      setChatConversationId(null);
+      setChatMessages([]);
+      setChatError(null);
+      setChatLoading(false);
+      return;
+    }
+
     setChatLoading(true);
     setChatError(null);
 
@@ -176,7 +187,7 @@ export default function TenderDetailPage() {
 
     setChatMessages(historyRes.data.messages);
     setChatLoading(false);
-  }, [tenderId]);
+  }, [isExpiredReadOnly, tenderId]);
 
   React.useEffect(() => {
     void loadTenderChat();
@@ -361,16 +372,19 @@ export default function TenderDetailPage() {
       showSearch={false}
       actions={
         <div className="flex flex-wrap gap-2">
-          <TLWatchToggle tenderId={tender.id} />
-          <Link href={`/tenders/${tender.id}/workspace`}>
-            <TLButton>
-              <Database className="size-4 mr-2" />
-              Workspace
-            </TLButton>
-          </Link>
+          {!isExpiredReadOnly ? <TLWatchToggle tenderId={tender.id} /> : null}
+          {!isExpiredReadOnly ? (
+            <Link href={`/tenders/${tender.id}/workspace`}>
+              <TLButton>
+                <Database className="size-4 mr-2" />
+                Workspace
+              </TLButton>
+            </Link>
+          ) : null}
 
-          {(tender.status === TenderStatus.COMPLETED ||
-            tender.status === TenderStatus.DRAFT) && (
+          {!isExpiredReadOnly &&
+          (tender.status === TenderStatus.COMPLETED ||
+            tender.status === TenderStatus.DRAFT) ? (
             <>
               <Link href={`/tenders/${tender.id}/checklist`}>
                 <TLButton variant="outline">
@@ -385,10 +399,20 @@ export default function TenderDetailPage() {
                 </TLButton>
               </Link>
             </>
-          )}
+          ) : null}
         </div>
       }
     >
+      {isExpiredReadOnly ? (
+        <TLSection>
+          <TLInlineAlert title="Read-only history mode" variant="info">
+            Your trial has expired. Tender history and documents remain
+            available, but workspace, watchlist, summary, checklist, and chat
+            actions are disabled.
+          </TLInlineAlert>
+        </TLSection>
+      ) : null}
+
       {tender.status === TenderStatus.FAILED && (
         <TLSection>
           <TLInlineAlert variant="error" title="Processing Failed">
@@ -586,109 +610,111 @@ export default function TenderDetailPage() {
           </Card>
         </TLSection>
 
-        <div id="ai-tender-chat">
-          <TLSection
-            title="AI Tender Chat"
-            description="Ask questions about this tender and get answers grounded in extracted document sections."
-            className="min-w-0"
-            right={
-              <div className="flex items-center gap-2">
-                <Link
-                  href={
-                    chatConversationId ? `/chat/${chatConversationId}` : "/chat"
-                  }
-                >
-                  <TLButton variant="outline" size="sm">
-                    {chatConversationId ? "Open Full Chat" : "Open Chat Hub"}
+        {!isExpiredReadOnly ? (
+          <div id="ai-tender-chat">
+            <TLSection
+              title="AI Tender Chat"
+              description="Ask questions about this tender and get answers grounded in extracted document sections."
+              className="min-w-0"
+              right={
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={
+                      chatConversationId ? `/chat/${chatConversationId}` : "/chat"
+                    }
+                  >
+                    <TLButton variant="outline" size="sm">
+                      {chatConversationId ? "Open Full Chat" : "Open Chat Hub"}
+                    </TLButton>
+                  </Link>
+                  <TLButton
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void loadTenderChat();
+                    }}
+                    disabled={chatLoading || chatSending}
+                  >
+                    Refresh Chat
                   </TLButton>
-                </Link>
-                <TLButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    void loadTenderChat();
-                  }}
-                  disabled={chatLoading || chatSending}
-                >
-                  Refresh Chat
-                </TLButton>
-              </div>
-            }
-          >
-            <Card className="min-w-0 w-full">
-              <CardContent className="p-5 space-y-4">
-                {tender.status !== TenderStatus.COMPLETED ? (
-                  <TLInlineAlert
-                    variant="info"
-                    title="Chat context not ready yet"
-                  >
-                    Current state: {tenderStatusLabel(tender.status)}. You can
-                    chat now, but answers may be limited until the tender is
-                    Ready.
-                  </TLInlineAlert>
-                ) : null}
+                </div>
+              }
+            >
+              <Card className="min-w-0 w-full">
+                <CardContent className="p-5 space-y-4">
+                  {tender.status !== TenderStatus.COMPLETED ? (
+                    <TLInlineAlert
+                      variant="info"
+                      title="Chat context not ready yet"
+                    >
+                      Current state: {tenderStatusLabel(tender.status)}. You can
+                      chat now, but answers may be limited until the tender is
+                      Ready.
+                    </TLInlineAlert>
+                  ) : null}
 
-                {chatError ? (
-                  <TLInlineAlert variant="error" title="Chat unavailable">
-                    {chatError}
-                  </TLInlineAlert>
-                ) : null}
-                {!canWriteChat ? (
-                  <TLInlineAlert
-                    variant="neutral"
-                    title="Read-only chat access"
-                  >
-                    Your role is VIEWER. You can read conversation history, but
-                    only MEMBER, ADMIN, or OWNER can start chats and send
-                    messages.
-                  </TLInlineAlert>
-                ) : null}
+                  {chatError ? (
+                    <TLInlineAlert variant="error" title="Chat unavailable">
+                      {chatError}
+                    </TLInlineAlert>
+                  ) : null}
+                  {!canWriteChat ? (
+                    <TLInlineAlert
+                      variant="neutral"
+                      title="Read-only chat access"
+                    >
+                      Your role is VIEWER. You can read conversation history, but
+                      only MEMBER, ADMIN, or OWNER can start chats and send
+                      messages.
+                    </TLInlineAlert>
+                  ) : null}
 
-                {chatLoading ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-full" />
-                  </div>
-                ) : chatMessages.length === 0 ? (
-                  <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-                    No chat messages yet. Ask your first question about
-                    requirements, deadlines, compliance, or submission details.
-                  </div>
-                ) : (
-                  <div className="grid gap-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                    {chatMessages.map((m) => (
-                      <TLChatMessage key={m.id} m={m} />
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-                )}
+                  {chatLoading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-20 w-full" />
+                      <Skeleton className="h-20 w-full" />
+                    </div>
+                  ) : chatMessages.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
+                      No chat messages yet. Ask your first question about
+                      requirements, deadlines, compliance, or submission details.
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                      {chatMessages.map((m) => (
+                        <TLChatMessage key={m.id} m={m} />
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
 
-                {chatSending ? (
-                  <TLTypingBubble
-                    text={
-                      pendingQuestion
-                        ? `Working on: ${pendingQuestion}`
-                        : "Analyzing tender documents..."
+                  {chatSending ? (
+                    <TLTypingBubble
+                      text={
+                        pendingQuestion
+                          ? `Working on: ${pendingQuestion}`
+                          : "Analyzing tender documents..."
+                      }
+                    />
+                  ) : null}
+
+                  <TLChatComposer
+                    value={chatInput}
+                    onChange={setChatInput}
+                    onSend={sendTenderChatMessage}
+                    sending={chatSending}
+                    disabled={chatLoading || chatSending || !canWriteChat}
+                    placeholder={
+                      canWriteChat
+                        ? "Ask this tender anything, e.g. What is required for submission and when is closing?"
+                        : "Read-only access: ask a MEMBER, ADMIN, or OWNER to send chat messages."
                     }
                   />
-                ) : null}
-
-                <TLChatComposer
-                  value={chatInput}
-                  onChange={setChatInput}
-                  onSend={sendTenderChatMessage}
-                  sending={chatSending}
-                  disabled={chatLoading || chatSending || !canWriteChat}
-                  placeholder={
-                    canWriteChat
-                      ? "Ask this tender anything, e.g. What is required for submission and when is closing?"
-                      : "Read-only access: ask a MEMBER, ADMIN, or OWNER to send chat messages."
-                  }
-                />
-              </CardContent>
-            </Card>
-          </TLSection>
-        </div>
+                </CardContent>
+              </Card>
+            </TLSection>
+          </div>
+        ) : null}
       </div>
     </TenderLensAppShell>
   );
