@@ -26,6 +26,9 @@ export default function OrgsPage() {
   const auth = useAuth();
   const [name, setName] = React.useState("");
   const [creating, setCreating] = React.useState(false);
+  const [editingOrgId, setEditingOrgId] = React.useState<string | null>(null);
+  const [editingName, setEditingName] = React.useState("");
+  const [savingOrgId, setSavingOrgId] = React.useState<string | null>(null);
 
   const activeOrgId =
     typeof window !== "undefined"
@@ -60,6 +63,42 @@ export default function OrgsPage() {
     window.localStorage.setItem("tl_active_org_id", orgId);
     toast.message("Active organization updated");
     auth.refreshMe();
+  }
+
+  function startEdit(orgId: string, currentName: string) {
+    setEditingOrgId(orgId);
+    setEditingName(currentName);
+  }
+
+  function cancelEdit() {
+    setEditingOrgId(null);
+    setEditingName("");
+  }
+
+  async function saveOrg(orgId: string) {
+    if (!editingName.trim()) {
+      toast.error("Missing organization name");
+      return;
+    }
+
+    setSavingOrgId(orgId);
+    const res = await apiFetch<Org>(`/api/v1/orgs/${orgId}`, {
+      method: "PATCH",
+      orgId,
+      body: JSON.stringify({ name: editingName }),
+    });
+    setSavingOrgId(null);
+
+    if (!res.ok) {
+      toast.error("Failed to update organization", {
+        description: res.error.message,
+      });
+      return;
+    }
+
+    toast.success("Organization updated");
+    cancelEdit();
+    await auth.refreshMe();
   }
 
   const orgs = auth.me?.orgs ?? [];
@@ -113,7 +152,15 @@ export default function OrgsPage() {
                 {orgs.map((o) => (
                   <TableRow key={o.org.id}>
                     <TableCell className="font-semibold">
-                      {o.org.name}
+                      {editingOrgId === o.org.id ? (
+                        <Input
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          className="h-9"
+                        />
+                      ) : (
+                        o.org.name
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {o.org.slug}
@@ -122,17 +169,45 @@ export default function OrgsPage() {
                       {o.role}
                     </TableCell>
                     <TableCell className="text-right">
-                      {activeOrgId === o.org.id ? (
-                        <span className="text-xs font-semibold text-primary">
-                          Active
-                        </span>
+                      {editingOrgId === o.org.id ? (
+                        <div className="flex justify-end gap-2">
+                          <TLButton
+                            variant="secondary"
+                            onClick={cancelEdit}
+                            disabled={savingOrgId === o.org.id}
+                          >
+                            Cancel
+                          </TLButton>
+                          <TLButton
+                            onClick={() => void saveOrg(o.org.id)}
+                            disabled={savingOrgId === o.org.id}
+                          >
+                            {savingOrgId === o.org.id ? "Saving..." : "Save"}
+                          </TLButton>
+                        </div>
                       ) : (
-                        <TLButton
-                          variant="secondary"
-                          onClick={() => setActive(o.org.id)}
-                        >
-                          Set active
-                        </TLButton>
+                        <div className="flex justify-end gap-2">
+                          {activeOrgId === o.org.id ? (
+                            <span className="self-center text-xs font-semibold text-primary">
+                              Active
+                            </span>
+                          ) : (
+                            <TLButton
+                              variant="secondary"
+                              onClick={() => setActive(o.org.id)}
+                            >
+                              Set active
+                            </TLButton>
+                          )}
+                          {o.role === "OWNER" ? (
+                            <TLButton
+                              variant="ghost"
+                              onClick={() => startEdit(o.org.id, o.org.name)}
+                            >
+                              Edit
+                            </TLButton>
+                          ) : null}
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>

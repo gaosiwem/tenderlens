@@ -2,7 +2,6 @@ import { Router } from "express"
 import { z } from "zod"
 import multer from "multer"
 import crypto from "crypto"
-import path from "path"
 import { requireAuth } from "../../middleware/auth.middleware"
 import { requireOrgMembership } from "../../middleware/tenant.middleware"
 import { requireRole } from "../../middleware/rbac.middleware"
@@ -11,6 +10,7 @@ import {
   getOrCreateWorkspace,
   getWorkspace,
   updateWorkspace,
+  deleteWorkspace,
 } from "./workspace.service"
 import { createTask, listTasks, updateTask, addComment } from "./tasks.service"
 import { calculateRiskScore } from "../risk/risk.service"
@@ -21,6 +21,11 @@ import { emitEvent } from "../notifications/notifications.service"
 import { NotificationType } from "@prisma/client"
 import { emitWorkspace } from "../../realtime/broadcast"
 import { requirePlanFeature, enforceTrial } from "../../billing/plan.middleware"
+import { env } from "../../config/env"
+import {
+  parseAllowedMimeTypes,
+  validateUploadedFile,
+} from "../../utils/uploadValidation"
 
 export const workspaceRouter = Router()
 
@@ -97,6 +102,35 @@ workspaceRouter.patch(
       emitWorkspace(updated.id, "workspace:updated", { workspace: updated })
 
       res.json(ok(updated))
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+workspaceRouter.delete(
+  "/:tenderId/workspace",
+  requireAuth,
+  requireOrgMembership,
+  requireRole("ADMIN"),
+  async (req, res, next) => {
+    try {
+      await enforceTrial(req.orgId!)
+      await requirePlanFeature(req.orgId!, "workspace")
+
+      const deleted = await deleteWorkspace({
+        orgId: req.orgId!,
+        tenderId: req.params.tenderId,
+      })
+
+      if (deleted.workspaceId) {
+        emitWorkspace(deleted.workspaceId, "workspace:updated", {
+          workspaceId: deleted.workspaceId,
+          deleted: true,
+        })
+      }
+
+      res.json(ok(deleted))
     } catch (e) {
       next(e)
     }
@@ -352,22 +386,24 @@ workspaceRouter.post(
 
       const file = (req as any).file
       if (!file) throw new AppError("VALIDATION_ERROR", "Missing file", 400)
+      const validated = validateUploadedFile({
+        file,
+        allowedMimeTypes: parseAllowedMimeTypes(env.ATTACHMENTS_ALLOWED_MIME),
+        fileLabel: "Attachment",
+      })
 
       const workspace = await getOrCreateWorkspace({
         orgId: req.orgId!,
         tenderId: req.params.tenderId,
       })
 
-      const safeName = (file.originalname || "attachment").replace(
-        /[^a-zA-Z0-9._-]/g,
-        "_",
-      )
+      const safeName = validated.safeName
       const key = `org/${req.orgId}/workspace/${workspace.id}/${crypto.randomUUID()}-${safeName}`
 
       const stored = await storage().putObject({
         key,
         body: file.buffer,
-        mimeType: file.mimetype,
+        mimeType: validated.mimeType,
       })
 
       const attachment = await prisma.bidAttachment.create({

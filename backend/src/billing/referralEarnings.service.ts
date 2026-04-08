@@ -31,12 +31,17 @@ export async function computeReferralEarnings() {
 
     if (!ref) continue
 
-    // Prevent duplicates for same subscription
-    const existing = await prisma.referralEarning.findFirst({
-      where: {
-        stripeSubscriptionId: a.stripeSubscriptionId ?? undefined,
-      },
-    })
+    // Prevent duplicate earnings for the same billing conversion.
+    const existing = a.billingReference
+      ? await prisma.referralEarning.findFirst({
+          where: { billingReference: a.billingReference },
+        })
+      : await prisma.referralEarning.findFirst({
+          where: {
+            referralCodeId: ref.id,
+            attributedOrgId: a.orgId,
+          },
+        })
 
     if (existing) continue
 
@@ -51,7 +56,7 @@ export async function computeReferralEarnings() {
         userId: ref.userId ?? null,
         referralCodeId: ref.id,
         attributedOrgId: a.orgId,
-        stripeSubscriptionId: a.stripeSubscriptionId ?? null,
+        billingReference: a.billingReference ?? null,
         amountCents,
         currency,
         status: "PENDING",

@@ -4,6 +4,7 @@ import { env } from "../../config/env"
 import { AppError } from "../../utils/responses"
 import { ORG_PROFILE_TENDER_SOURCE } from "../orgDocs/orgDocs.constants"
 import { logger } from "../../utils/logger"
+import { CacheService } from "../../utils/cache"
 
 const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY })
 type AIProvider = "openai" | "gemini"
@@ -351,9 +352,23 @@ export async function getBidChecklist(args: {
   orgId: string
   tenderId: string
 }) {
-  return prisma.bidChecklist.findFirst({
+  const existing = await prisma.bidChecklist.findFirst({
     where: { orgId: args.orgId, tenderId: args.tenderId },
   })
+
+  if (!existing) {
+    const cached = await CacheService.get<any>(CacheService.getAiKey(args.tenderId, "checklist"))
+    if (cached) {
+      return {
+        ...cached,
+        id: "cached-" + args.tenderId,
+        orgId: args.orgId,
+        isCached: true,
+      }
+    }
+  }
+
+  return existing
 }
 
 export async function generateBidChecklist(args: {
@@ -433,9 +448,14 @@ Return JSON format: {
     })
   }
 
-  return prisma.bidChecklist.create({
+  const saved = await prisma.bidChecklist.create({
     data: checklistData,
   })
+
+  // Cache globally for other organizations
+  await CacheService.set(CacheService.getAiKey(args.tenderId, "checklist"), saved)
+
+  return saved
 }
 
 export async function updateBidChecklist(args: {

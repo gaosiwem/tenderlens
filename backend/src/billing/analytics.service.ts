@@ -5,6 +5,7 @@ export type BillingEventName =
   | "upgrade_clicked"
   | "checkout_started"
   | "checkout_completed"
+  | "checkout_failed"
   | "portal_opened"
   | "member_limit_hit"
   | "watchlist_limit_hit"

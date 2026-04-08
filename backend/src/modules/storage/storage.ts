@@ -8,7 +8,7 @@ let driver: StorageDriver | null = null
 export function storage(): StorageDriver {
   if (driver) return driver
   driver =
-    env.STORAGE_DRIVER === "s3"
+    env.STORAGE_DRIVER === "s3" || env.STORAGE_DRIVER === "supabase"
       ? new S3StorageDriver()
       : new LocalStorageDriver()
   return driver

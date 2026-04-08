@@ -51,7 +51,7 @@ export const PLAN_CONFIG: Record<PlanType, PlanConfig> = {
     customAlertRules: true,
   },
   ENTERPRISE: {
-    monthlyPriceCents: 150000,
+    monthlyPriceCents: 149900,
     maxWatchlist: "unlimited",
     maxAiQueries: "unlimited",
     workspace: true,

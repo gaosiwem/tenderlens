@@ -66,7 +66,7 @@ const BOOLEAN_LIMIT_FIELDS = [
   { key: "exportsEnabled", label: "PDF/XLSX exports" },
   { key: "workspaceEnabled", label: "Workspace & tasks" },
   { key: "compareEnabled", label: "Tender compare" },
-  { key: "whatsappEnabled", label: "WhatsApp alerts" },
+  { key: "whatsappEnabled", label: "SMS alerts" },
   { key: "riskEnabled", label: "Risk scoring" },
 ] as const;
 
@@ -433,7 +433,7 @@ export default function BusinessSettingsPage() {
                       )
                     }
                   />
-                  WhatsApp
+                  SMS
                 </label>
               </div>
               <div className="space-y-2 rounded-md border border-border p-3">
@@ -486,7 +486,7 @@ export default function BusinessSettingsPage() {
                       )
                     }
                   />
-                  WhatsApp
+                  SMS
                 </label>
               </div>
               <label className="flex items-center justify-between">
@@ -647,11 +647,11 @@ export default function BusinessSettingsPage() {
         )}
       </TLSection>
 
-      <TLSection title="Workspace Templates">
+      <TLSection title="Workspace Categories">
         <Card>
           <CardContent className="grid grid-cols-1 gap-3 p-6 md:grid-cols-3">
             <Input
-              placeholder="Template name"
+              placeholder="Category name"
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
             />
@@ -665,7 +665,7 @@ export default function BusinessSettingsPage() {
                 const name = templateName.trim();
                 const firstTask = templateTaskTitle.trim();
                 if (!name || !firstTask) {
-                  toast.error("Template name and task title are required");
+                  toast.error("Category name and task title are required");
                   return;
                 }
                 const res = await createWorkspaceTemplate({
@@ -673,7 +673,7 @@ export default function BusinessSettingsPage() {
                   tasks: [{ title: firstTask }],
                 });
                 if (!res.ok) {
-                  toast.error("Failed to create template", {
+                  toast.error("Failed to create category", {
                     description: res.error.message,
                   });
                   return;
@@ -703,7 +703,7 @@ export default function BusinessSettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <Input
-                    placeholder="Template name"
+                    placeholder="Category name"
                     value={draft.name}
                     onChange={(e) =>
                       setTemplateDrafts((prev) => ({
@@ -716,7 +716,7 @@ export default function BusinessSettingsPage() {
                     }
                   />
                   <Input
-                    placeholder="Template description"
+                    placeholder="Category description"
                     value={draft.description}
                     onChange={(e) =>
                       setTemplateDrafts((prev) => ({
@@ -729,7 +729,7 @@ export default function BusinessSettingsPage() {
                     }
                   />
                   <label className="flex items-center justify-between rounded-md border border-input px-3">
-                    <span className="text-sm">Default template</span>
+                    <span className="text-sm">Default category</span>
                     <Switch
                       checked={draft.isDefault}
                       onCheckedChange={(v) =>
@@ -746,7 +746,7 @@ export default function BusinessSettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto]">
                   <Input
-                    placeholder="Tender ID to apply this template"
+                    placeholder="Tender ID to apply this category"
                     value={draft.applyTenderId}
                     onChange={(e) =>
                       setTemplateDrafts((prev) => ({
@@ -763,7 +763,7 @@ export default function BusinessSettingsPage() {
                     onClick={async () => {
                       const name = draft.name.trim();
                       if (!name) {
-                        toast.error("Template name is required");
+                        toast.error("Category name is required");
                         return;
                       }
                       const res = await updateWorkspaceTemplate(template.id, {
@@ -772,7 +772,7 @@ export default function BusinessSettingsPage() {
                         isDefault: draft.isDefault,
                       });
                       if (!res.ok) {
-                        toast.error("Failed to update template", {
+                        toast.error("Failed to update category", {
                           description: res.error.message,
                         });
                         return;
@@ -780,7 +780,7 @@ export default function BusinessSettingsPage() {
                       await load();
                     }}
                   >
-                    Save Template
+                    Save Category
                   </TLButton>
                   <TLButton
                     onClick={async () => {
@@ -794,7 +794,7 @@ export default function BusinessSettingsPage() {
                         tenderId,
                       );
                       if (!res.ok) {
-                        toast.error("Failed to apply template", {
+                        toast.error("Failed to apply category", {
                           description: res.error.message,
                         });
                         return;
@@ -809,7 +809,7 @@ export default function BusinessSettingsPage() {
                       }));
                     }}
                   >
-                    Apply Template
+                    Apply Category
                   </TLButton>
                 </div>
                 <TLButton
@@ -817,7 +817,7 @@ export default function BusinessSettingsPage() {
                   onClick={async () => {
                     const res = await deleteWorkspaceTemplate(template.id);
                     if (!res.ok) {
-                      toast.error("Failed to archive template", {
+                      toast.error("Failed to archive category", {
                         description: res.error.message,
                       });
                       return;

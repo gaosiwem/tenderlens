@@ -1,4 +1,5 @@
 import http from "http"
+import { initSentry, registerSentryProcessHandlers } from "./monitoring/sentry"
 import { env } from "./config/env"
 import { createApp } from "./app"
 import { logger } from "./utils/logger"
@@ -10,6 +11,9 @@ import { scheduleRevenueSprint3Jobs } from "./jobs/revenueSprint3.job"
 import { scheduleRevenueSprint4Jobs } from "./jobs/revenueSprint4.job"
 import { scheduleRevenueSprint5Jobs } from "./jobs/revenueSprint5.job"
 import { scheduleBusinessSupportJobs } from "./jobs/businessSupport.job"
+
+initSentry("api")
+registerSentryProcessHandlers("api")
 
 const app = createApp()
 const server = http.createServer(app)

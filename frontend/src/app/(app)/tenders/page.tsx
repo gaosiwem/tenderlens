@@ -27,9 +27,21 @@ type SortField = "title" | "status" | "closingDate" | "companyName";
 type SortDirection = "asc" | "desc";
 type LifecycleFilter = "open" | "awarded" | "closed" | "cancelled" | "all";
 
-function normalizeSortDirection(value: string | null): SortDirection {
-  if (value === "asc" || value === "desc") return value;
+function getDefaultSortDirection(
+  lifecycle: LifecycleFilter,
+  sortField: SortField,
+): SortDirection {
+  if (lifecycle === "open" && sortField === "closingDate") return "asc";
   return "desc";
+}
+
+function normalizeSortDirection(
+  value: string | null,
+  lifecycle: LifecycleFilter,
+  sortField: SortField,
+): SortDirection {
+  if (value === "asc" || value === "desc") return value;
+  return getDefaultSortDirection(lifecycle, sortField);
 }
 
 function normalizeLifecycle(value: string | null): LifecycleFilter {
@@ -76,10 +88,14 @@ export default function TendersPage() {
   const initialSearch = searchParams.get("search") ?? "";
   const initialPage = Number(searchParams.get("page") ?? "1");
   const initialPageSize = Number(searchParams.get("pageSize") ?? "10");
+  const initialLifecycle = normalizeLifecycle(searchParams.get("lifecycle"));
   const initialSortField =
     (searchParams.get("sort") as SortField) ?? "closingDate";
-  const initialSortDir = normalizeSortDirection(searchParams.get("dir"));
-  const initialLifecycle = normalizeLifecycle(searchParams.get("lifecycle"));
+  const initialSortDir = normalizeSortDirection(
+    searchParams.get("dir"),
+    initialLifecycle,
+    initialSortField,
+  );
 
   const [tenders, setTenders] = React.useState<TenderListItem[]>([]);
   const [totalItems, setTotalItems] = React.useState(0);
@@ -166,7 +182,7 @@ export default function TendersPage() {
     if (lifecycleFromUrl !== lifecycle) {
       setLifecycle(lifecycleFromUrl);
       setSortField("closingDate");
-      setSortDirection("desc");
+      setSortDirection(getDefaultSortDirection(lifecycleFromUrl, "closingDate"));
       setPage(1);
     }
   }, [lifecycle, searchParams]);

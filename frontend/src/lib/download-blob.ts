@@ -1,25 +1,9 @@
 import {
   baseUrl,
-  getAccessToken,
+  ensureAccessToken,
   getActiveOrgId,
   getUserSafeErrorMessage,
-  setAccessToken,
 } from "./api";
-
-type RefreshResponse =
-  | { ok: true; data: { accessToken: string } }
-  | { ok: false; error?: { message?: string } };
-
-async function refreshAccessToken(): Promise<string | null> {
-  const res = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
-    method: "POST",
-    credentials: "include",
-  });
-
-  const json = (await res.json().catch(() => null)) as RefreshResponse | null;
-  if (!json || !json.ok) return null;
-  return json.data.accessToken;
-}
 
 export async function downloadBlob(url: string, filename: string) {
   const isApiUrl = url.startsWith("/") || url.startsWith(`${baseUrl}/`);
@@ -48,11 +32,7 @@ export async function downloadBlob(url: string, filename: string) {
   const orgId = getActiveOrgId();
   if (orgId) headers.set("x-org-id", orgId);
 
-  let token = getAccessToken();
-  if (!token) {
-    token = await refreshAccessToken();
-    if (token) setAccessToken(token);
-  }
+  let token = (await ensureAccessToken()).token;
 
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
@@ -62,9 +42,8 @@ export async function downloadBlob(url: string, filename: string) {
   });
 
   if (res.status === 401) {
-    const newToken = await refreshAccessToken();
+    const newToken = (await ensureAccessToken({ forceRefresh: true })).token;
     if (newToken) {
-      setAccessToken(newToken);
       headers.set("Authorization", `Bearer ${newToken}`);
       res = await fetch(fullUrl, {
         headers,

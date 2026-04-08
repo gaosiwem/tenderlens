@@ -2,11 +2,33 @@ import { prisma } from "../../db/prisma"
 import { env } from "../../config/env"
 import { AppError } from "../../utils/responses"
 import { generateOtp, hashOtp } from "../../utils/otp"
-import { sendWhatsApp } from "../notifications/whatsapp.sender"
+import { sendSms } from "../notifications/sms.sender"
 import { getEffectivePlanConfig } from "../../billing/effective-plan.service"
 
 function minutesFromNow(m: number) {
   return new Date(Date.now() + m * 60_000)
+}
+
+function normalizePhoneNumber(input: string) {
+  const compact = input.replace(/[\s()-]/g, "")
+
+  let normalized = compact
+  if (normalized.startsWith("00")) {
+    normalized = `+${normalized.slice(2)}`
+  } else if (normalized.startsWith("0")) {
+    // Default local-format numbers to South Africa for this deployment.
+    normalized = `+27${normalized.slice(1)}`
+  }
+
+  if (!/^\+[1-9]\d{7,14}$/.test(normalized)) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Enter a valid phone number in international format.",
+      400,
+    )
+  }
+
+  return normalized
 }
 
 async function resolvePlanConfig(orgId: string) {
@@ -19,15 +41,17 @@ export async function startVerification(args: {
   userId: string
   whatsappNumber: string
 }) {
-  if (!env.WHATSAPP_VERIFICATION_ENABLED) {
-    throw new AppError("DISABLED", "WhatsApp verification disabled", 400)
+  const phoneNumber = normalizePhoneNumber(args.whatsappNumber)
+
+  if (!env.SMS_VERIFICATION_ENABLED) {
+    throw new AppError("DISABLED", "SMS verification disabled", 400)
   }
 
   const cfg = await resolvePlanConfig(args.orgId)
   if (!cfg.whatsapp) {
     throw new AppError(
       "PLAN_UPGRADE_REQUIRED",
-      "WhatsApp alerts are not available on your current plan.",
+      "SMS alerts are not available on your current plan.",
       403,
       { upgrade: true, limitType: "alerts" },
     )
@@ -42,7 +66,7 @@ export async function startVerification(args: {
     },
   })
 
-  if (count >= env.WHATSAPP_OTP_RATE_LIMIT_PER_HOUR) {
+  if (count >= env.SMS_OTP_RATE_LIMIT_PER_HOUR) {
     throw new AppError(
       "RATE_LIMITED",
       "Too many OTP requests. Try again later.",
@@ -52,24 +76,28 @@ export async function startVerification(args: {
 
   const otp = generateOtp()
   const otpHash = hashOtp(otp)
-  const expiresAt = minutesFromNow(env.WHATSAPP_OTP_TTL_MINUTES)
+  const expiresAt = minutesFromNow(env.SMS_OTP_TTL_MINUTES)
 
   const row = await prisma.whatsAppVerification.create({
     data: {
       orgId: args.orgId,
       userId: args.userId,
-      whatsappNumber: args.whatsappNumber,
+      whatsappNumber: phoneNumber,
       otpHash,
       expiresAt,
     },
   })
 
-  await sendWhatsApp(
-    args.whatsappNumber,
-    `TenderLens verification code: ${otp}. Expires in ${env.WHATSAPP_OTP_TTL_MINUTES} minutes.`,
+  await sendSms(
+    phoneNumber,
+    `TenderLens verification code: ${otp}. Expires in ${env.SMS_OTP_TTL_MINUTES} minutes.`,
   )
 
-  return { verificationId: row.id, expiresAt: row.expiresAt }
+  return {
+    verificationId: row.id,
+    expiresAt: row.expiresAt,
+    phoneNumber,
+  }
 }
 
 export async function verifyOtp(args: {
@@ -82,7 +110,7 @@ export async function verifyOtp(args: {
   if (!cfg.whatsapp) {
     throw new AppError(
       "PLAN_UPGRADE_REQUIRED",
-      "WhatsApp alerts are not available on your current plan.",
+      "SMS alerts are not available on your current plan.",
       403,
       { upgrade: true, limitType: "alerts" },
     )
@@ -98,11 +126,11 @@ export async function verifyOtp(args: {
 
   if (!row) throw new AppError("NOT_FOUND", "Verification not found", 404)
   if (row.verifiedAt)
-    return { verified: true, whatsappNumber: row.whatsappNumber }
+    return { verified: true, phoneNumber: row.whatsappNumber }
   if (row.expiresAt < new Date()) {
     throw new AppError("EXPIRED", "Code expired. Request a new one.", 400)
   }
-  if (row.attempts >= env.WHATSAPP_OTP_MAX_ATTEMPTS) {
+  if (row.attempts >= env.SMS_OTP_MAX_ATTEMPTS) {
     throw new AppError("LOCKED", "Too many attempts. Request a new code.", 400)
   }
 
@@ -145,5 +173,5 @@ export async function verifyOtp(args: {
     })
   }
 
-  return { verified: true, whatsappNumber: row.whatsappNumber }
+  return { verified: true, phoneNumber: row.whatsappNumber }
 }

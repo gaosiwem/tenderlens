@@ -4,7 +4,10 @@ import * as React from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { TLButton } from "@/components/tenderlens/button";
-import { uploadWorkspaceAttachment } from "@/lib/attachments.api";
+import {
+  downloadWorkspaceAttachment,
+  uploadWorkspaceAttachment,
+} from "@/lib/attachments.api";
 import type { BidAttachment } from "@/lib/workspace.types";
 
 export function TLAttachmentUploader(props: {
@@ -13,6 +16,7 @@ export function TLAttachmentUploader(props: {
   attachments: BidAttachment[];
 }) {
   const [uploading, setUploading] = React.useState(false);
+  const [downloadingId, setDownloadingId] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement | null>(null);
 
   async function onPickFile(f: File) {
@@ -26,6 +30,19 @@ export function TLAttachmentUploader(props: {
     }
     toast.success("Uploaded");
     await props.onUploaded();
+  }
+
+  async function onDownloadAttachment(attachment: BidAttachment) {
+    setDownloadingId(attachment.id);
+    const res = await downloadWorkspaceAttachment(
+      attachment.id,
+      attachment.filename,
+    );
+    setDownloadingId(null);
+
+    if (!res.ok) {
+      toast.error("Download failed", { description: res.error.message });
+    }
   }
 
   return (
@@ -76,18 +93,14 @@ export function TLAttachmentUploader(props: {
                   {a.mimeType} . {Math.round(a.sizeBytes / 1024)} KB
                 </div>
               </div>
-              {a.url ? (
-                <a
-                  className="text-sm underline"
-                  href={a.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open
-                </a>
-              ) : (
-                <div className="text-xs text-muted-foreground">No url</div>
-              )}
+              <button
+                type="button"
+                className="text-sm underline"
+                onClick={() => void onDownloadAttachment(a)}
+                disabled={downloadingId === a.id}
+              >
+                {downloadingId === a.id ? "Downloading..." : "Download"}
+              </button>
             </div>
           ))}
         </div>

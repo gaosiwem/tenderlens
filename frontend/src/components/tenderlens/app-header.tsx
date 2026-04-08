@@ -31,6 +31,20 @@ export function TenderLensAppHeader(props: {
   const auth = useAuth();
 
   const isAdmin = isSystemAdmin(auth.me);
+  const activeOrgId =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("tl_active_org_id")
+      : null;
+  const currentOrgMembership =
+    auth.me?.orgs.find((membership) => membership.org.id === activeOrgId) ??
+    auth.me?.orgs[0] ??
+    null;
+  const createdAtLabel = auth.me?.user.createdAt
+    ? new Date(auth.me.user.createdAt).toLocaleDateString()
+    : "-";
+  const verificationLabel = auth.me?.user.emailVerifiedAt
+    ? "Verified"
+    : "Pending";
 
   return (
     <div className="tl-surface px-4 py-3">
@@ -111,7 +125,36 @@ export function TenderLensAppHeader(props: {
                 </span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuContent align="end" className="w-80">
+              <div className="mx-2 mt-2 mb-1 rounded-md border border-border/60 bg-muted/20 p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  User Profile
+                </div>
+                <div className="mt-2 text-sm font-semibold text-foreground">
+                  {auth.me?.user.name ?? "Account"}
+                </div>
+                <div className="text-xs text-muted-foreground break-all">
+                  {auth.me?.user.email ?? "-"}
+                </div>
+                <div className="mt-3 grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1 text-xs">
+                  <span className="text-muted-foreground">Organization</span>
+                  <span className="text-right font-medium text-foreground">
+                    {currentOrgMembership?.org.name ?? "-"}
+                  </span>
+                  <span className="text-muted-foreground">Role</span>
+                  <span className="text-right font-medium text-foreground">
+                    {currentOrgMembership?.role ?? "-"}
+                  </span>
+                  <span className="text-muted-foreground">Created</span>
+                  <span className="text-right font-medium text-foreground">
+                    {createdAtLabel}
+                  </span>
+                  <span className="text-muted-foreground">Email Status</span>
+                  <span className="text-right font-medium text-foreground">
+                    {verificationLabel}
+                  </span>
+                </div>
+              </div>
               <DropdownMenuItem onClick={() => router.push("/orgs")}>
                 Organizations
               </DropdownMenuItem>

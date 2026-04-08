@@ -20,18 +20,63 @@ if (resolvedEnvPath) {
   dotenv.config()
 }
 
+const storageDriver = (
+  process.env.STORAGE_DRIVER ?? "local"
+) as "local" | "s3" | "supabase"
+const isSupabaseStorage = storageDriver === "supabase"
+
+function resolveObjectStorageValue(args: {
+  supabaseEnv: string
+  genericEnv: string
+  fallback: string
+}) {
+  if (isSupabaseStorage) {
+    return (
+      process.env[args.supabaseEnv] ??
+      process.env[args.genericEnv] ??
+      args.fallback
+    )
+  }
+
+  return process.env[args.genericEnv] ?? args.fallback
+}
+
+function parseOriginList(rawValue: string | undefined, envName: string) {
+  const origins = String(rawValue ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+
+  if (origins.length === 0) {
+    throw new Error(`Missing allowed origins in ${envName}`)
+  }
+
+  for (const origin of origins) {
+    let parsed: URL
+    try {
+      parsed = new URL(origin)
+    } catch {
+      throw new Error(`Invalid origin configured in ${envName}: ${origin}`)
+    }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error(`Unsupported origin protocol in ${envName}: ${origin}`)
+    }
+
+    if (parsed.origin !== origin) {
+      throw new Error(`Origin must not include a path in ${envName}: ${origin}`)
+    }
+  }
+
+  return [...new Set(origins)]
+}
+
 export const env = {
   PORT: process.env.PORT || 8080,
   DATABASE_URL: process.env.DATABASE_URL,
-  JWT_SECRET:
-    process.env.JWT_SECRET ||
-    "6e8f1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
-  JWT_ACCESS_SECRET:
-    process.env.JWT_ACCESS_SECRET ||
-    "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
-  JWT_REFRESH_SECRET:
-    process.env.JWT_REFRESH_SECRET ||
-    "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
+  JWT_SECRET: process.env.JWT_SECRET ?? "",
+  JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET ?? "",
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET ?? "",
   JWT_ACCESS_TTL_MINUTES: Number(process.env.JWT_ACCESS_TTL_MINUTES ?? "15"),
   JWT_REFRESH_TTL_DAYS: Number(process.env.JWT_REFRESH_TTL_DAYS ?? "7"),
   EMAIL_VERIFICATION_REQUIRED:
@@ -43,30 +88,61 @@ export const env = {
     process.env.PASSWORD_RESET_TTL_HOURS ?? "1",
   ),
   NODE_ENV: process.env.NODE_ENV || "development",
-  COOKIE_SECRET:
-    process.env.COOKIE_SECRET ||
-    "e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6",
+  COOKIE_SECRET: process.env.COOKIE_SECRET ?? "",
   COOKIE_SECURE:
     (process.env.COOKIE_SECURE ??
       (process.env.NODE_ENV === "production" ? "true" : "false")) === "true",
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
-  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3005",
-  CORS_ORIGINS: (process.env.CORS_ORIGINS ?? "http://localhost:3005").split(
-    ",",
+  FRONTEND_URL: process.env.FRONTEND_URL || "http://127.0.0.1:3000",
+  CORS_ORIGINS: parseOriginList(
+    process.env.CORS_ORIGINS ?? "http://127.0.0.1:3000",
+    "CORS_ORIGINS",
   ),
+  CORS_ALLOW_NO_ORIGIN_PATHS: (
+    process.env.CORS_ALLOW_NO_ORIGIN_PATHS ??
+    "/health,/ready,/api/v1/billing/payfast/notify,/api/v1/payouts/webhook"
+  )
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
 
   REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
 
-  STORAGE_DRIVER: (process.env.STORAGE_DRIVER ?? "local") as "local" | "s3",
+  STORAGE_DRIVER: storageDriver,
   LOCAL_STORAGE_PATH: process.env.LOCAL_STORAGE_PATH ?? "./storage",
   MAX_UPLOAD_MB: Number(process.env.MAX_UPLOAD_MB ?? "20"),
 
-  S3_REGION: process.env.S3_REGION ?? "auto",
-  S3_ENDPOINT: process.env.S3_ENDPOINT ?? "",
-  S3_BUCKET: process.env.S3_BUCKET ?? "",
-  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ?? "",
-  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ?? "",
-  S3_FORCE_PATH_STYLE: (process.env.S3_FORCE_PATH_STYLE ?? "true") === "true",
+  S3_REGION: resolveObjectStorageValue({
+    supabaseEnv: "SUPABASE_S3_REGION",
+    genericEnv: "S3_REGION",
+    fallback: "auto",
+  }),
+  S3_ENDPOINT: resolveObjectStorageValue({
+    supabaseEnv: "SUPABASE_S3_ENDPOINT",
+    genericEnv: "S3_ENDPOINT",
+    fallback: "",
+  }),
+  S3_BUCKET: resolveObjectStorageValue({
+    supabaseEnv: "SUPABASE_S3_BUCKET",
+    genericEnv: "S3_BUCKET",
+    fallback: "",
+  }),
+  S3_ACCESS_KEY_ID: resolveObjectStorageValue({
+    supabaseEnv: "SUPABASE_S3_ACCESS_KEY_ID",
+    genericEnv: "S3_ACCESS_KEY_ID",
+    fallback: "",
+  }),
+  S3_SECRET_ACCESS_KEY: resolveObjectStorageValue({
+    supabaseEnv: "SUPABASE_S3_SECRET_ACCESS_KEY",
+    genericEnv: "S3_SECRET_ACCESS_KEY",
+    fallback: "",
+  }),
+  S3_FORCE_PATH_STYLE:
+    resolveObjectStorageValue({
+      supabaseEnv: "SUPABASE_S3_FORCE_PATH_STYLE",
+      genericEnv: "S3_FORCE_PATH_STYLE",
+      fallback: "true",
+    }) === "true",
 
   ENABLE_OCR: (process.env.ENABLE_OCR ?? "true") === "true",
   OCR_LANG: process.env.OCR_LANG ?? "eng",
@@ -81,12 +157,24 @@ export const env = {
 
   // Billing
 
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "",
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "",
-  STRIPE_SUCCESS_URL:
-    process.env.STRIPE_SUCCESS_URL ?? "http://localhost:3005/billing/success",
-  STRIPE_CANCEL_URL:
-    process.env.STRIPE_CANCEL_URL ?? "http://localhost:3005/billing/cancel",
+  BACKEND_PUBLIC_URL:
+    process.env.BACKEND_PUBLIC_URL ?? "http://127.0.0.1:8080",
+  PAYFAST_MERCHANT_ID: process.env.PAYFAST_MERCHANT_ID ?? "",
+  PAYFAST_MERCHANT_KEY: process.env.PAYFAST_MERCHANT_KEY ?? "",
+  PAYFAST_PASSPHRASE: process.env.PAYFAST_PASSPHRASE ?? "",
+  PAYFAST_SANDBOX: (process.env.PAYFAST_SANDBOX ?? "true") === "true",
+  PAYFAST_RETURN_URL:
+    process.env.PAYFAST_RETURN_URL ??
+    `${process.env.FRONTEND_URL || "http://127.0.0.1:3000"}/billing/success`,
+  PAYFAST_CANCEL_URL:
+    process.env.PAYFAST_CANCEL_URL ??
+    `${process.env.FRONTEND_URL || "http://127.0.0.1:3000"}/billing/cancel`,
+  PAYFAST_NOTIFY_URL:
+    process.env.PAYFAST_NOTIFY_URL ??
+    `${process.env.BACKEND_PUBLIC_URL || "http://127.0.0.1:8080"}/api/v1/billing/payfast/notify`,
+  DEV_TEST_ROUTES_ENABLED:
+    (process.env.DEV_TEST_ROUTES_ENABLED ?? "false") === "true",
+  PAYOUT_WEBHOOK_SECRET: process.env.PAYOUT_WEBHOOK_SECRET ?? "",
 
   // Chat & AI
   CHAT_ENABLED: (process.env.CHAT_ENABLED ?? "true") === "true",
@@ -141,14 +229,19 @@ export const env = {
   SMTP_PORT: Number(process.env.SMTP_PORT ?? "587"),
   SMTP_USER: process.env.SMTP_USER ?? "",
   SMTP_PASS: process.env.SMTP_PASS ?? "",
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
-
-  STRIPE_SUBSCRIPTIONS_ENABLED:
-    (process.env.STRIPE_SUBSCRIPTIONS_ENABLED ?? "true") === "true",
-  STRIPE_PRICE_STARTER_MONTHLY:
-    process.env.STRIPE_PRICE_STARTER_MONTHLY ?? "price_xxx",
-  STRIPE_PRICE_GROWTH_MONTHLY:
-    process.env.STRIPE_PRICE_GROWTH_MONTHLY ?? "price_xxx",
+  GOOGLE_CLIENT_ID:
+    process.env.GOOGLE_CLIENT_ID ??
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
+    "",
+  SENTRY_DSN: process.env.SENTRY_DSN ?? "",
+  SENTRY_ENVIRONMENT:
+    process.env.SENTRY_ENVIRONMENT ??
+    process.env.NODE_ENV ??
+    "development",
+  SENTRY_RELEASE: process.env.SENTRY_RELEASE ?? "",
+  SENTRY_TRACES_SAMPLE_RATE: Number(
+    process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0",
+  ),
 
   MONTHLY_GRANTS_ENABLED:
     (process.env.MONTHLY_GRANTS_ENABLED ?? "true") === "true",
@@ -172,14 +265,21 @@ export const env = {
     process.env.WATCHLIST_URGENT_REMINDER_TYPES ?? "CLOSING_2H",
   WATCHLIST_BATCHED_REMINDER_TYPES:
     process.env.WATCHLIST_BATCHED_REMINDER_TYPES ??
-    "CLOSING_7D,CLOSING_24H,BRIEFING_SESSION,SITE_VISIT",
+    "CLOSING_7D,CLOSING_24H,SITE_VISIT",
   PREFERENCES_ENABLED: (process.env.PREFERENCES_ENABLED ?? "true") === "true",
   DIGEST_ENABLED: (process.env.DIGEST_ENABLED ?? "true") === "true",
   DIGEST_CRON: process.env.DIGEST_CRON ?? "0 7 * * *",
 
-  WHATSAPP_ENABLED: (process.env.WHATSAPP_ENABLED ?? "false") === "true",
-  WHATSAPP_PROVIDER: process.env.WHATSAPP_PROVIDER ?? "twilio",
-  WHATSAPP_FROM_NUMBER: process.env.WHATSAPP_FROM_NUMBER ?? "",
+  SMS_ENABLED:
+    (process.env.SMS_ENABLED ?? process.env.WHATSAPP_ENABLED ?? "false") ===
+    "true",
+  SMS_PROVIDER:
+    process.env.SMS_PROVIDER ?? process.env.WHATSAPP_PROVIDER ?? "twilio",
+  SMS_FROM_NUMBER:
+    process.env.SMS_FROM_NUMBER ??
+    process.env.TWILIO_PHONE_NUMBER ??
+    process.env.WHATSAPP_FROM_NUMBER ??
+    "",
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID ?? "",
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN ?? "",
 
@@ -192,22 +292,34 @@ export const env = {
   ORG_DAILY_CREDIT_CAP: Number(process.env.ORG_DAILY_CREDIT_CAP ?? "5000"),
   USER_DAILY_CREDIT_CAP: Number(process.env.USER_DAILY_CREDIT_CAP ?? "1000"),
 
-  // cost in credits for sending each WhatsApp notification message (optional extra fee)
-  COST_WHATSAPP_NOTIFICATION: Number(
-    process.env.COST_WHATSAPP_NOTIFICATION ?? "1",
+  // cost in credits for sending each SMS notification message (optional extra fee)
+  COST_SMS_NOTIFICATION: Number(
+    process.env.COST_SMS_NOTIFICATION ??
+      process.env.COST_WHATSAPP_NOTIFICATION ??
+      "1",
   ),
 
   // Sprint 9
-  WHATSAPP_VERIFICATION_ENABLED:
-    (process.env.WHATSAPP_VERIFICATION_ENABLED ?? "true") === "true",
-  WHATSAPP_OTP_TTL_MINUTES: Number(
-    process.env.WHATSAPP_OTP_TTL_MINUTES ?? "10",
+  SMS_VERIFICATION_ENABLED:
+    (
+      process.env.SMS_VERIFICATION_ENABLED ??
+      process.env.WHATSAPP_VERIFICATION_ENABLED ??
+      "true"
+    ) === "true",
+  SMS_OTP_TTL_MINUTES: Number(
+    process.env.SMS_OTP_TTL_MINUTES ??
+      process.env.WHATSAPP_OTP_TTL_MINUTES ??
+      "10",
   ),
-  WHATSAPP_OTP_MAX_ATTEMPTS: Number(
-    process.env.WHATSAPP_OTP_MAX_ATTEMPTS ?? "5",
+  SMS_OTP_MAX_ATTEMPTS: Number(
+    process.env.SMS_OTP_MAX_ATTEMPTS ??
+      process.env.WHATSAPP_OTP_MAX_ATTEMPTS ??
+      "5",
   ),
-  WHATSAPP_OTP_RATE_LIMIT_PER_HOUR: Number(
-    process.env.WHATSAPP_OTP_RATE_LIMIT_PER_HOUR ?? "5",
+  SMS_OTP_RATE_LIMIT_PER_HOUR: Number(
+    process.env.SMS_OTP_RATE_LIMIT_PER_HOUR ??
+      process.env.WHATSAPP_OTP_RATE_LIMIT_PER_HOUR ??
+      "5",
   ),
 
   REMINDERS_ENABLED: (process.env.REMINDERS_ENABLED ?? "true") === "true",
@@ -249,7 +361,14 @@ export const env = {
 
   SOCKET_ENABLED: (process.env.SOCKET_ENABLED ?? "true") === "true",
   SOCKET_PATH: process.env.SOCKET_PATH ?? "/socket.io",
-  SOCKET_CORS_ORIGIN: process.env.SOCKET_CORS_ORIGIN ?? "http://localhost:3005",
+  SOCKET_CORS_ORIGIN: parseOriginList(
+    process.env.SOCKET_CORS_ORIGIN ?? "http://localhost:3005",
+    "SOCKET_CORS_ORIGIN",
+  ).join(","),
+  SOCKET_ALLOWED_ORIGINS: parseOriginList(
+    process.env.SOCKET_CORS_ORIGIN ?? "http://localhost:3005",
+    "SOCKET_CORS_ORIGIN",
+  ),
 
   // Sprint 10
   ATTACHMENTS_ENABLED: (process.env.ATTACHMENTS_ENABLED ?? "true") === "true",
@@ -288,12 +407,40 @@ export const env = {
   EXPERIMENTS_ENABLED: (process.env.EXPERIMENTS_ENABLED ?? "true") === "true",
 }
 
+const insecureSecrets = [
+  "super-secret-jwt-key",
+  "super-secret-access-key",
+  "super-secret-refresh-key",
+  "super-secret-cookie-key",
+  "6e8f1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
+  "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+  "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
+  "e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6",
+]
+
+const requiredRuntimeSecrets: Array<keyof typeof env> = [
+  "JWT_SECRET",
+  "JWT_ACCESS_SECRET",
+  "JWT_REFRESH_SECRET",
+  "COOKIE_SECRET",
+]
+
+for (const key of requiredRuntimeSecrets) {
+  const value = String(env[key] ?? "").trim()
+  if (!value) {
+    throw new Error(`Missing required secret env var: ${key}`)
+  }
+  if (insecureSecrets.includes(value)) {
+    throw new Error(`Insecure default secret configured for: ${key}`)
+  }
+}
+
 // Validation for production
 if (env.NODE_ENV === "production") {
   const criticalKeys: Array<keyof typeof env> = [
     "DATABASE_URL",
-    "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET",
+    "PAYFAST_MERCHANT_ID",
+    "PAYFAST_MERCHANT_KEY",
     "SMTP_PASS",
   ]
 
@@ -304,29 +451,8 @@ if (env.NODE_ENV === "production") {
   }
 
   for (const key of criticalKeys) {
-    if (!env[key] || env[key] === "price_xxx") {
+    if (!env[key]) {
       throw new Error(`Missing critical env var in production: ${key}`)
     }
-  }
-
-  const insecureSecrets = [
-    "super-secret-jwt-key",
-    "super-secret-access-key",
-    "super-secret-refresh-key",
-    "super-secret-cookie-key",
-    "6e8f1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
-    "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
-    "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
-    "e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6",
-  ]
-
-  if (
-    insecureSecrets.includes(env.JWT_SECRET as string) ||
-    insecureSecrets.includes(env.JWT_ACCESS_SECRET as string) ||
-    insecureSecrets.includes(env.JWT_REFRESH_SECRET as string)
-  ) {
-    console.warn(
-      "WARNING: Insecure default JWT/Cookie secrets are being used in production!",
-    )
   }
 }

@@ -22,17 +22,19 @@ export default function RegisterPage() {
   const [password, setPassword] = React.useState("");
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-[520px] px-4 py-10">
-        <Card className="tl-surface">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-[520px] space-y-6">
+        <div className="flex justify-center">
+          <BrandLogo size="auth" priority className="mx-auto" />
+        </div>
+        <Card className="tl-surface mx-auto">
           <CardContent className="p-6 space-y-5">
-            <div className="space-y-4">
-              <BrandLogo size="auth" priority className="mx-auto" />
+            <div className="space-y-4 text-center">
               <div className="font-display text-2xl font-extrabold">
                 Create account
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Use your work email to get started.
+                Create your account to start tracking tenders and collaborating with your team.
               </div>
             </div>
 

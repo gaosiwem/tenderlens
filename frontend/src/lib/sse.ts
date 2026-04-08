@@ -3,7 +3,7 @@ import type {
   StreamTokenEvent,
   StreamDoneEvent,
 } from "./stream.types";
-import { baseUrl, getAccessToken, getActiveOrgId } from "./api";
+import { baseUrl, ensureAccessToken, getActiveOrgId } from "./api";
 
 export type StreamHandlers = {
   onMeta?: (m: StreamMetaEvent) => void;
@@ -26,7 +26,7 @@ export function streamChatMessage(args: {
     : controller.signal;
 
   async function start() {
-    const token = getAccessToken();
+    const { token } = await ensureAccessToken();
     const orgId = getActiveOrgId();
 
     const headers: Record<string, string> = {

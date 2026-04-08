@@ -17,7 +17,7 @@ export function TLPartnerCard(props: { partner: Partner }) {
     const r = await createPartnerReferralCode();
     setLoading(false);
     if (!r.ok) {
-      toast.error("Failed", { description: (r.error as any).message });
+      toast.error("Failed", { description: r.error.message });
       return;
     }
     setCode(r.data.code);
@@ -91,7 +91,7 @@ export function TLPartnerCard(props: { partner: Partner }) {
         </div>
 
         <div className="text-[10px] text-muted-foreground/40 italic leading-relaxed border-t border-border/40 pt-4">
-          Earnings are attributed based on tracked Stripe operations using your
+          Earnings are attributed from tracked billing conversions using your
           unique identifier. Payouts are finalized according to your master
           agreement terms.
         </div>

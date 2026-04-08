@@ -8,11 +8,13 @@ import {
   createOrgSchema,
   addMemberSchema,
   updateMemberRoleSchema,
+  updateOrgSchema,
 } from "./org.schemas"
 import {
   listUserOrgs,
   createOrg,
   getOrg,
+  updateOrg,
   listMembers,
   addMember,
   updateMemberRole,
@@ -113,6 +115,38 @@ orgRouter.get("/", requireAuth, async (req, res, next) => {
     next(e)
   }
 })
+
+orgRouter.patch(
+  "/:orgId",
+  requireAuth,
+  requireOrgMembership,
+  requireRole("OWNER"),
+  async (req, res, next) => {
+    try {
+      const body = updateOrgSchema.parse(req.body)
+      const orgId = String(req.params.orgId)
+      const org = await updateOrg(orgId, body.name)
+
+      await auditLog({
+        req,
+        action: "ORG_UPDATE",
+        orgId,
+        userId: req.auth!.userId,
+        entityType: "Organization",
+        entityId: org.id,
+        meta: { name: org.name, slug: org.slug },
+      })
+
+      res.json(ok(org))
+    } catch (e: any) {
+      if (e?.name === "ZodError")
+        return next(
+          new AppError("VALIDATION_ERROR", "Invalid input", 400, e.flatten()),
+        )
+      next(e)
+    }
+  },
+)
 
 orgRouter.post("/", requireAuth, async (req, res, next) => {
   try {

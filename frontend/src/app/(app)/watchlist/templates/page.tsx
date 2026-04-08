@@ -22,7 +22,7 @@ export default function WatchlistTemplatesPage() {
     setLoading(false);
 
     if (!res.ok) {
-      toast.error("Failed to load templates", {
+      toast.error("Failed to load categories", {
         description: res.error.message,
       });
       setItems([]);
@@ -39,7 +39,7 @@ export default function WatchlistTemplatesPage() {
     <TenderLensAppShell title="TenderLens" subtitle="Watchlist">
       <div className="space-y-8">
         <TLSection
-          title="Watchlist Templates"
+          title="Watchlist Categories"
           description="Automate your tender discovery by category."
           right={
             <div className="flex items-center gap-2">
@@ -53,11 +53,11 @@ export default function WatchlistTemplatesPage() {
           }
         >
           <div className="mb-8">
-            <TLInlineAlert variant="info" title="How Templates Work">
+            <TLInlineAlert variant="info" title="How Categories Work">
               <div className="text-sm space-y-2">
                 <p>
-                  Watchlist templates help you automate the discovery of tenders
-                  you care about. When you apply a template:
+                  Watchlist categories help you automate the discovery of tenders
+                  you care about. When you apply a category:
                 </p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
                   <li>

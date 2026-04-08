@@ -6,6 +6,7 @@ import { prisma } from "../../db/prisma"
 import { ok, AppError } from "../../utils/responses"
 import {
   getDeadlineContactName,
+  getDeadlineEnquiryContacts,
   getOrRefreshDeadlines,
   refreshDeadlines,
 } from "./deadlines.service"
@@ -29,6 +30,7 @@ deadlinesRouter.get(
         ? {
             ...d,
             contactName: getDeadlineContactName(d.citations),
+            enquiryContacts: getDeadlineEnquiryContacts(d.citations),
           }
         : null
       res.json(ok({ deadlines: enriched }))
@@ -53,7 +55,14 @@ deadlinesRouter.post(
         )
       const tenderId = String(req.params.tenderId)
       const out = await refreshDeadlines({ orgId: req.orgId!, tenderId })
-      res.json(ok({ deadlines: out }))
+      const enriched = out
+        ? {
+            ...out,
+            contactName: getDeadlineContactName(out.citations),
+            enquiryContacts: getDeadlineEnquiryContacts(out.citations),
+          }
+        : null
+      res.json(ok({ deadlines: enriched }))
     } catch (e) {
       next(e)
     }

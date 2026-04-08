@@ -30,7 +30,7 @@ export async function enqueueDeliveries(args: {
     queued += emailRecipients.length
   }
 
-  if (env.WHATSAPP_ENABLED) {
+  if (env.SMS_ENABLED) {
     const waRecipients = await getRecipientsForChannel({
       orgId: args.orgId,
       channel: "whatsapp",

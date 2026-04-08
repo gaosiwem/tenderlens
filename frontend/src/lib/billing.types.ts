@@ -17,8 +17,6 @@ export interface Subscription {
   orgId: string;
   plan: PlanType;
   status: SubscriptionStatus;
-  stripeCustomerId?: string;
-  stripeSubscriptionId?: string;
   trialEndsAt?: string;
   currentPeriodStart?: string;
   currentPeriodEnd?: string;

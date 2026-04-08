@@ -13,8 +13,10 @@ import type { OrgMember } from "@/lib/org.types";
 import type { Subscription, Usage } from "@/lib/billing.types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth";
 
 export default function MembersPage() {
+  const auth = useAuth();
   const [loading, setLoading] = React.useState(true);
   const [items, setItems] = React.useState<OrgMember[]>([]);
   const [search, setSearch] = React.useState("");
@@ -22,7 +24,6 @@ export default function MembersPage() {
     null,
   );
   const [usage, setUsage] = React.useState<Usage | null>(null);
-  const [userRole, setUserRole] = React.useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -43,16 +44,6 @@ export default function MembersPage() {
 
     setItems(membersRes.data.items);
 
-    // Find current user's role
-    const currentUserEmail =
-      typeof window !== "undefined"
-        ? localStorage.getItem("tl_user_email")
-        : null;
-    const currentMember = membersRes.data.items.find(
-      (m) => m.email === currentUserEmail,
-    );
-    setUserRole(currentMember?.role || null);
-
     if (subRes.ok) {
       setSubscription(subRes.data.subscription);
     }
@@ -71,6 +62,15 @@ export default function MembersPage() {
       m.email?.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const activeOrgId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("tl_active_org_id")
+      : null;
+  const currentOrgMembership =
+    auth.me?.orgs.find((membership) => membership.org.id === activeOrgId) ??
+    auth.me?.orgs[0] ??
+    null;
+  const userRole = currentOrgMembership?.role ?? null;
   const isAdmin = userRole === "ADMIN" || userRole === "OWNER";
   const maxMembers = usage?.limits?.maxMembers;
   const seatsUsed = subscription?.seatsUsed ?? items.length;

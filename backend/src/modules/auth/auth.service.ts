@@ -226,10 +226,72 @@ export async function loginUser(input: { email: string; password: string }) {
   if (!passwordOk)
     throw new AppError("UNAUTHORIZED", "Invalid credentials", 401)
 
+  if (user.mustChangePassword) {
+    throw new AppError(
+      "PASSWORD_CHANGE_REQUIRED",
+      "You must change your temporary password before signing in.",
+      403,
+    )
+  }
+
   await startPendingTrialForUser(user.id)
 
   const session = await createSession(user.id)
 
+  const { passwordHash, ...userWithoutPassword } = user
+  return {
+    user: userWithoutPassword,
+    ...session,
+  }
+}
+
+export async function completeInvitePassword(input: {
+  email: string
+  temporaryPassword: string
+  newPassword: string
+}) {
+  const user = await prisma.user.findUnique({ where: { email: input.email } })
+  if (!user || !user.isActive) {
+    throw new AppError("UNAUTHORIZED", "Invalid credentials", 401)
+  }
+
+  if (!user.mustChangePassword) {
+    throw new AppError(
+      "INVALID_STATE",
+      "This account does not require an invite password change.",
+      400,
+    )
+  }
+
+  const storedPasswordHash = user.passwordHash ?? ""
+  const tempPasswordOk = storedPasswordHash
+    ? await verifyPassword(storedPasswordHash, input.temporaryPassword)
+    : false
+
+  if (!tempPasswordOk) {
+    throw new AppError("UNAUTHORIZED", "Invalid credentials", 401)
+  }
+
+  const newHash = await hashPassword(input.newPassword)
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: newHash,
+        mustChangePassword: false,
+        emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+      },
+    }),
+    prisma.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ])
+
+  await startPendingTrialForUser(user.id)
+
+  const session = await createSession(user.id)
   const { passwordHash, ...userWithoutPassword } = user
   return {
     user: userWithoutPassword,

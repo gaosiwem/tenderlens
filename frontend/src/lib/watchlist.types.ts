@@ -2,7 +2,6 @@ export type WatchlistReminderType =
   | "CLOSING_7D"
   | "CLOSING_24H"
   | "CLOSING_2H"
-  | "BRIEFING_SESSION"
   | "SITE_VISIT";
 
 export type WatchlistNotificationChannel = "email" | "whatsapp";

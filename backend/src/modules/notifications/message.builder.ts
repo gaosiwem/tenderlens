@@ -18,7 +18,6 @@ const WATCHLIST_REMINDER_LABELS: Record<string, string> = {
   CLOSING_7D: "Closing in 7 days",
   CLOSING_24H: "Closing in 24 hours",
   CLOSING_2H: "Closing in 2 hours",
-  BRIEFING_SESSION: "Briefing session in 24 hours",
   SITE_VISIT: "Site visit in 24 hours",
 }
 

@@ -48,25 +48,41 @@ export default function OrgDocsPage() {
   const [ready, setReady] = React.useState(false);
   const [processing, setProcessing] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
+  const [polling, setPolling] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const [deletingFileId, setDeletingFileId] = React.useState<string | null>(null);
   const [pendingDeleteDoc, setPendingDeleteDoc] =
     React.useState<OrgBusinessDocFile | null>(null);
   const [file, setFile] = React.useState<File | null>(null);
 
-  const load = React.useCallback(async () => {
-    setLoading(true);
-    const res = await listOrgBusinessDocs();
-    setLoading(false);
-    if (!res.ok) {
-      toast.error("Failed to load business documents", {
-        description: res.error.message,
-      });
-      return;
+  const processingCount = React.useMemo(
+    () =>
+      items.filter(
+        (item) => item.status === "queued" || item.status === "processing",
+      ).length,
+    [items],
+  );
+
+  const load = React.useCallback(async (options?: { silent?: boolean }) => {
+    if (options?.silent) setPolling(true);
+    else setLoading(true);
+    try {
+      const res = await listOrgBusinessDocs();
+      if (!res.ok) {
+        if (!options?.silent) {
+          toast.error("Failed to load business documents", {
+            description: res.error.message,
+          });
+        }
+        return;
+      }
+      setItems(res.data.items);
+      setReady(res.data.ready);
+      setProcessing(res.data.processing);
+    } finally {
+      if (options?.silent) setPolling(false);
+      else setLoading(false);
     }
-    setItems(res.data.items);
-    setReady(res.data.ready);
-    setProcessing(res.data.processing);
   }, []);
 
   async function upload() {
@@ -111,7 +127,7 @@ export default function OrgDocsPage() {
   React.useEffect(() => {
     if (!processing) return;
     const timer = setInterval(() => {
-      void load();
+      void load({ silent: true });
     }, 2500);
     return () => clearInterval(timer);
   }, [processing, load]);
@@ -124,10 +140,12 @@ export default function OrgDocsPage() {
         right={
           <TLButton
             variant="secondary"
-            onClick={load}
+            onClick={() => {
+              void load();
+            }}
             disabled={loading || uploading}
           >
-            Refresh
+            {loading ? "Refreshing..." : "Refresh"}
           </TLButton>
         }
       >
@@ -135,7 +153,12 @@ export default function OrgDocsPage() {
           {processing ? (
             <TLInlineAlert variant="info" title="Processing documents">
               Your uploaded business documents are being extracted.
-              Eligibility checks will improve when processing completes.
+              {processingCount > 0
+                ? ` ${processingCount} document${processingCount === 1 ? "" : "s"} ${processingCount === 1 ? "is" : "are"} still in the queue.`
+                : ""}
+              {polling
+                ? " We are checking progress automatically."
+                : " Eligibility checks will improve when processing completes."}
             </TLInlineAlert>
           ) : ready ? (
             <TLInlineAlert
@@ -200,7 +223,7 @@ export default function OrgDocsPage() {
             <div className="px-4 py-3 text-sm font-semibold border-b bg-muted/30">
               Uploaded documents
             </div>
-            {loading ? (
+            {loading && items.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground">
                 Loading...
               </div>
@@ -219,9 +242,6 @@ export default function OrgDocsPage() {
                       <div className="text-sm font-medium truncate flex items-center gap-2">
                         <FileText className="size-4 text-primary" />
                         {doc.originalFilename}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatSize(doc.sizeBytes)} - {doc.mimeType}
                       </div>
                       {doc.status === "failed" && doc.statusMessage ? (
                         <div className="text-xs text-red-600 truncate max-w-[40ch]">

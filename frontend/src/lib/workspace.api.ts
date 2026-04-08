@@ -7,32 +7,34 @@ import type {
   BidWorkspace,
 } from "./workspace.types";
 
+type WorkspaceTaskCommentApi = BidTaskComment & { body?: string };
+
+type WorkspaceTaskApi = Omit<BidTask, "comments"> & {
+  comments?: WorkspaceTaskCommentApi[];
+};
+
+type WorkspaceFullApiResponse = BidWorkspace & {
+  tasks?: WorkspaceTaskApi[];
+  activities?: BidActivity[];
+  attachments?: BidAttachment[];
+};
+
 export async function getWorkspaceByTender(tenderId: string) {
-  const res = await apiFetch<any>(`/api/v1/tenders/${tenderId}/workspace/full`, {
-    method: "GET",
-  });
+  const res = await apiFetch<WorkspaceFullApiResponse>(
+    `/api/v1/tenders/${tenderId}/workspace/full`,
+    {
+      method: "GET",
+    },
+  );
   if (!res.ok) return res;
 
-  const rawWorkspace = res.data as BidWorkspace & {
-    tasks?: Array<
-      Omit<BidTask, "comments"> & {
-        comments?: Array<BidTaskComment & { body?: string }>;
-      }
-    >;
-    activities?: BidActivity[];
-    attachments?: BidAttachment[];
-  };
+  const rawWorkspace = res.data;
   const tasks: BidTask[] = (rawWorkspace.tasks ?? []).map((t) => ({
     ...t,
     comments: (t.comments ?? []).map((c) => {
-      const fallbackBody =
-        "body" in (c as Record<string, unknown>) &&
-        typeof (c as Record<string, unknown>).body === "string"
-          ? String((c as Record<string, unknown>).body)
-          : "";
       return {
         ...c,
-        content: c?.content ?? fallbackBody,
+        content: c.content ?? c.body ?? "",
       };
     }),
   }));
@@ -61,6 +63,15 @@ export async function updateWorkspace(
   );
   if (!res.ok) return res;
   return { ok: true as const, data: { workspace: res.data } };
+}
+
+export async function deleteWorkspace(tenderId: string) {
+  const res = await apiFetch<{ deleted: boolean; workspaceId: string | null }>(
+    `/api/v1/workspace/${tenderId}/workspace`,
+    { method: "DELETE" },
+  );
+  if (!res.ok) return res;
+  return { ok: true as const, data: res.data };
 }
 
 export async function createTask(tenderId: string, input: Partial<BidTask>) {
@@ -96,7 +107,7 @@ export async function addComment(
   taskId: string,
   content: string,
 ) {
-  const res = await apiFetch<any>(
+  const res = await apiFetch<WorkspaceTaskCommentApi>(
     `/api/v1/workspace/${tenderId}/workspace/tasks/${taskId}/comments`,
     { method: "POST", body: JSON.stringify({ content }) },
   );

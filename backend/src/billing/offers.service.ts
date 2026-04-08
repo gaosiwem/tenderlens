@@ -48,7 +48,7 @@ export async function generateUpgradeOffers() {
         s.orgId,
         "SPIKE_PAYWALL",
         "Unlock the features you’re trying to use",
-        "Pro unlocks workspace, exports, compare, and WhatsApp alerts.",
+        "Pro unlocks workspace, exports, compare, and SMS alerts.",
         "View plans",
         Number(process.env.UPGRADE_OFFER_EXPIRY_HOURS ?? 24),
       )

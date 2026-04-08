@@ -211,7 +211,7 @@ export default function WatchlistPage() {
       "Tender Title",
       "Company",
       "Closing Date",
-      "Template",
+      "Category",
       "Notes",
       "Date Added",
     ];
@@ -400,10 +400,12 @@ export default function WatchlistPage() {
                 }}
                 className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer"
               >
-                <option value="all">All Templates</option>
+                <option value="all">All Categories</option>
                 {uniqueTemplates.map((t) => (
                   <option key={t} value={t}>
-                    {prettyTemplateId(t).replace("Template: ", "")}
+                    {prettyTemplateId(t)
+                      .replace("Template: ", "")
+                      .replace("Category: ", "")}
                   </option>
                 ))}
               </select>
@@ -740,7 +742,6 @@ const CLOSING_REMINDER_TYPES: WatchlistReminderType[] = [
 
 const ALL_REMINDER_TYPES: WatchlistReminderType[] = [
   ...CLOSING_REMINDER_TYPES,
-  "BRIEFING_SESSION",
   "SITE_VISIT",
 ];
 
@@ -753,7 +754,6 @@ const REMINDER_LABELS: Record<WatchlistReminderType, string> = {
   CLOSING_7D: "7d",
   CLOSING_24H: "24h",
   CLOSING_2H: "2h",
-  BRIEFING_SESSION: "Briefing",
   SITE_VISIT: "Site visit",
 };
 
@@ -762,11 +762,11 @@ const NOTIFICATION_CHANNEL_LABELS: Record<
   string
 > = {
   email: "Email",
-  whatsapp: "WhatsApp",
+  whatsapp: "SMS",
 };
 
 function prettyTemplateId(templateId: string) {
-  if (!templateId) return "No Template";
+  if (!templateId) return "No Category";
   if (templateId.startsWith("cat-")) {
     try {
       const hex = templateId.slice(4);

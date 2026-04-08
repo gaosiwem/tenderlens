@@ -54,6 +54,19 @@ type QuestionSignals = {
   wantsCompliance: boolean
 }
 
+function parsePositiveInt(
+  raw: string | undefined,
+  fallback: number,
+  min = 1,
+  max = Number.POSITIVE_INFINITY,
+) {
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed)) return fallback
+  const rounded = Math.floor(parsed)
+  if (rounded < min || rounded > max) return fallback
+  return rounded
+}
+
 function taggedExternalFilename(doc: ExternalDoc) {
   return `${doc.name} [etenders:${doc.id}]`
 }
@@ -148,6 +161,7 @@ function looksLikeHtml(buf: Buffer) {
 
 async function extractTextPrimaryForChat(mimeType: string, buf: Buffer) {
   if (mimeType === "application/pdf") {
+    let parsedText = ""
     try {
       logger.info(
         `[chat:debug] PDF extraction: creating PDFParse with ${buf.length} bytes`,
@@ -155,24 +169,42 @@ async function extractTextPrimaryForChat(mimeType: string, buf: Buffer) {
       const parser = new PDFParse({ data: buf })
       logger.info(`[chat:debug] PDF extraction: calling getText()...`)
       const out = await parser.getText()
-      const text = out.text ?? ""
+      parsedText = out.text ?? ""
       logger.info(
-        `[chat:debug] PDF extraction: got ${text.length} chars, ${out.total} pages`,
+        `[chat:debug] PDF extraction: got ${parsedText.length} chars, ${out.total} pages`,
       )
-      if (isWeakTextForChat(text) && env.ENABLE_OCR) {
-        logger.info(`[chat:debug] PDF text is weak, falling back to OCR`)
-        const ocr = await ocrPdfBuffer(buf)
-        return ocr.text ?? text
+      if (isWeakTextForChat(parsedText) && env.ENABLE_OCR) {
+        logger.info(
+          `[chat:debug] PDF text is weak, attempting OCR fallback`,
+        )
+        try {
+          const ocr = await ocrPdfBuffer(buf)
+          return ocr.text ?? parsedText
+        } catch (ocrErr) {
+          logger.warn(
+            { error: String(ocrErr) },
+            "PDF OCR fallback failed, using parsed PDF text",
+          )
+          return parsedText
+        }
       }
-      return text
+      return parsedText
     } catch (err) {
       logger.warn(
         { error: String(err) },
         "PDF text extraction failed, falling back to OCR",
       )
       if (!env.ENABLE_OCR) return ""
-      const ocr = await ocrPdfBuffer(buf)
-      return ocr.text ?? ""
+      try {
+        const ocr = await ocrPdfBuffer(buf)
+        return ocr.text ?? parsedText
+      } catch (ocrErr) {
+        logger.warn(
+          { error: String(ocrErr) },
+          "PDF OCR fallback failed after parser error",
+        )
+        return parsedText
+      }
     }
   }
 
@@ -195,7 +227,12 @@ type ExternalHydrationSummary = {
 }
 
 const GENERATED_TENDER_CONTEXT_FILENAME = "Tender Overview (generated).txt"
-const EXTERNAL_DOC_FETCH_TIMEOUT_MS = 15000
+const EXTERNAL_DOC_FETCH_TIMEOUT_MS = parsePositiveInt(
+  process.env.CHAT_EXTERNAL_DOC_FETCH_TIMEOUT_MS,
+  45000,
+  5000,
+  180000,
+)
 const CHAT_FILE_INDEX_CANDIDATE_LIMIT = 6
 const CHAT_EXTERNAL_DOC_INDEX_CANDIDATE_LIMIT = 5
 
@@ -819,21 +856,42 @@ async function ensureChunksFromExternalDocs(args: {
       const safeName =
         doc.name.replace(/[^a-zA-Z0-9._-]/g, "_").trim() || `external-${doc.id}`
       const key = `org/${args.orgId}/tenders/${args.tenderId}/external/${crypto.randomUUID()}-${safeName}`
-      const stored = await storage().putObject({
-        key,
-        body: buf,
-        mimeType,
-      })
+      const checksum = sha256(buf)
+      let storageKey = key
+      let persistedMimeType = mimeType
+      let persistedSizeBytes = buf.length
+      let persistedChecksum = checksum
+      try {
+        const stored = await storage().putObject({
+          key,
+          body: buf,
+          mimeType,
+        })
+        storageKey = stored.key
+        persistedMimeType = stored.mimeType
+        persistedSizeBytes = stored.sizeBytes
+        persistedChecksum = stored.checksumSha256 || checksum
+      } catch (storageError) {
+        // Keep extraction/indexing available even when object storage is transiently down.
+        storageKey = `external-unstored://${args.tenderId}/${doc.id}`
+        logger.warn(
+          `[chat] External doc storage failed, continuing with text-only indexing for ${doc.id}: ${
+            storageError instanceof Error
+              ? storageError.message
+              : String(storageError)
+          }`,
+        )
+      }
 
       const file = await prisma.tenderFile.create({
         data: {
           orgId: args.orgId,
           tenderId: args.tenderId,
-          storageKey: stored.key,
+          storageKey,
           originalFilename: taggedFilename,
-          mimeType: stored.mimeType,
-          sizeBytes: stored.sizeBytes,
-          checksumSha256: stored.checksumSha256 || sha256(buf),
+          mimeType: persistedMimeType,
+          sizeBytes: persistedSizeBytes,
+          checksumSha256: persistedChecksum,
         },
       })
 

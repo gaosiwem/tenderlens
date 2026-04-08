@@ -2,15 +2,17 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { TenderLensAppShell } from "@/components/tenderlens/app-shell";
 import { TLSection } from "@/components/tenderlens/section";
 import { TLPlanCard } from "@/components/tenderlens/plan-card";
-import { startPlanCheckout } from "@/lib/billing.api";
+import { completeSandboxCheckout, startPlanCheckout } from "@/lib/billing.api";
 import { useBilling } from "@/hooks/use-billing";
 import { trackBillingEvent } from "@/lib/billing-analytics.api";
 import { formatPlanDisplayName } from "@/lib/billing.types";
 
 export default function PricingPage() {
+  const router = useRouter();
   const { subscription } = useBilling();
   const [loading, setLoading] = React.useState<string | null>(null);
   const currentPlan = subscription?.plan ?? "TRIAL";
@@ -19,7 +21,7 @@ export default function PricingPage() {
     "View Open, Awarded, Closed, and Cancelled tenders",
     "Unlimited watched tenders",
     "Unlimited AI queries during trial",
-    "Advanced email and WhatsApp alerts",
+    "Advanced email and SMS alerts",
     "Tender comparison, workspace, exports, and risk scoring",
   ];
   const proOnlyFeatures = [
@@ -30,13 +32,13 @@ export default function PricingPage() {
     "Team workspace & tasks",
     "Bid checklists & risk scoring",
     "PDF & XLSX exports",
-    "WhatsApp & Email alerts",
+    "SMS & Email alerts",
   ];
   const businessOnlyFeatures = [
     "Includes everything from Pro",
     "Up to 15 team members",
     "Advanced alert automations",
-    "Workspace templates & task governance",
+    "Workspace categories & task governance",
     "Bid analytics dashboards",
     "API-style exports and integrations",
     "Dedicated onboarding assistance",
@@ -55,6 +57,27 @@ export default function PricingPage() {
     await trackBillingEvent(name, { plan, currentPlan, ...meta });
   }
 
+  function submitPayFastCheckout(args: {
+    paymentUrl: string;
+    fields: Record<string, string>;
+  }) {
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = args.paymentUrl;
+    form.style.display = "none";
+
+    for (const [key, value] of Object.entries(args.fields)) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = key;
+      input.value = value;
+      form.appendChild(input);
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   async function upgrade(plan: "PRO" | "BUSINESS") {
     await logPlanEvent("upgrade_clicked", plan);
     setLoading(plan);
@@ -66,11 +89,20 @@ export default function PricingPage() {
       return;
     }
 
-    await logPlanEvent("checkout_started", plan);
-
-    if (res.data.checkoutUrl) {
-      window.location.href = res.data.checkoutUrl;
+    if (res.data.gateway === "PAYFAST_SANDBOX_LOCAL") {
+      const completed = await completeSandboxCheckout();
+      if (!completed.ok) {
+        toast.error("Checkout failed", { description: completed.error.message });
+        return;
+      }
+      router.push("/billing/success");
+      return;
     }
+
+    submitPayFastCheckout({
+      paymentUrl: res.data.paymentUrl,
+      fields: res.data.fields,
+    });
   }
 
   React.useEffect(() => {
@@ -110,7 +142,7 @@ export default function PricingPage() {
           <TLPlanCard
             plan="BUSINESS"
             title={formatPlanDisplayName("BUSINESS")}
-            priceLabel="R1500 / month"
+            priceLabel="R1499 / month"
             ctaLabel={
               loading === "BUSINESS" ? "Connecting..." : "Upgrade to Business"
             }

@@ -362,16 +362,16 @@ export default function TenderDetailPage() {
       actions={
         <div className="flex flex-wrap gap-2">
           <TLWatchToggle tenderId={tender.id} />
+          <Link href={`/tenders/${tender.id}/workspace`}>
+            <TLButton>
+              <Database className="size-4 mr-2" />
+              Workspace
+            </TLButton>
+          </Link>
+
           {(tender.status === TenderStatus.COMPLETED ||
             tender.status === TenderStatus.DRAFT) && (
             <>
-              <Link href={`/tenders/${tender.id}/workspace`}>
-                <TLButton>
-                  <Database className="size-4 mr-2" />
-                  Workspace
-                </TLButton>
-              </Link>
-
               <Link href={`/tenders/${tender.id}/checklist`}>
                 <TLButton variant="outline">
                   <ListChecks className="size-4 mr-2" />
@@ -430,17 +430,14 @@ export default function TenderDetailPage() {
               </div>
 
               <div className="min-w-0 w-full text-sm">
-                <Link
-                  href={`/tenders/${tender.id}`}
-                  className="block rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                >
+                <div className="block rounded-sm">
                   <div className="text-muted-foreground text-xs uppercase tracking-wide">
                     Tender Title
                   </div>
                   <h1 className="text-sm font-bold tracking-tight text-foreground/90 md:text-base break-words">
                     {tender.title}
                   </h1>
-                </Link>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">

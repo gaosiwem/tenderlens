@@ -6,7 +6,6 @@ import {
   WATCHLIST_NOTIFICATION_CHANNELS,
   WATCHLIST_REMINDER_TYPES,
 } from "../watchlist/watchlist.service"
-import { backfillBriefingReminderForTenderWatchers } from "../watchlist/watchlist.defaults"
 
 const watchlistReminderTypeSet = new Set<string>(WATCHLIST_REMINDER_TYPES)
 const watchlistNotificationChannelSet = new Set<string>(
@@ -17,7 +16,6 @@ const DEFAULT_URGENT_WATCHLIST_REMINDER_TYPES = new Set<string>(["CLOSING_2H"])
 const DEFAULT_BATCHED_WATCHLIST_REMINDER_TYPES = new Set<string>([
   "CLOSING_7D",
   "CLOSING_24H",
-  "BRIEFING_SESSION",
   "SITE_VISIT",
 ])
 
@@ -462,7 +460,8 @@ async function upsertReminder(
 ) {
   return prisma.tenderReminder.upsert({
     where: {
-      tenderId_type_fireAt: {
+      orgId_tenderId_type_fireAt: {
+        orgId,
         tenderId,
         type,
         fireAt,
@@ -478,6 +477,37 @@ async function upsertReminder(
   })
 }
 
+async function getWatchingOrgIdsForReminder(args: {
+  tenderId: string
+  reminderType: string
+}) {
+  const watchers = await prisma.watchlistItem.findMany({
+    where: {
+      tenderId: args.tenderId,
+      reminderTypes: { has: args.reminderType },
+    },
+    select: { orgId: true },
+    distinct: ["orgId"],
+  })
+
+  return watchers.map((watcher) => watcher.orgId)
+}
+
+async function scheduleWatchlistReminderForWatchingOrgs(args: {
+  tenderId: string
+  reminderType: string
+  fireAt: Date
+}) {
+  const orgIds = await getWatchingOrgIdsForReminder({
+    tenderId: args.tenderId,
+    reminderType: args.reminderType,
+  })
+
+  for (const orgId of orgIds) {
+    await upsertReminder(orgId, args.tenderId, args.reminderType, args.fireAt)
+  }
+}
+
 export async function scheduleReminders() {
   if (!env.REMINDERS_ENABLED) return
 
@@ -490,45 +520,38 @@ export async function scheduleReminders() {
   })
 
   for (const tender of tenders) {
-    if (!tender.deadlines || !tender.orgId) continue
+    if (!tender.deadlines) continue
 
-    const { closingAt, briefingAt, siteVisitAt } = tender.deadlines
+    const { closingAt, siteVisitAt } = tender.deadlines
 
     if (closingAt && closingAt > new Date()) {
       for (const hours of windows) {
         const fireAt = new Date(closingAt.getTime() - hours * 60 * 60_000)
         if (fireAt <= new Date()) continue
 
-        await upsertReminder(
-          tender.orgId,
-          tender.id,
+        const reminderType =
           hours === 168
             ? "CLOSING_7D"
             : hours === 24
               ? "CLOSING_24H"
-              : "CLOSING_2H",
-          fireAt,
-        )
-      }
-    }
+              : "CLOSING_2H"
 
-    if (briefingAt) {
-      await backfillBriefingReminderForTenderWatchers(tender.id)
-      const fireAt = new Date(briefingAt.getTime() - 24 * 60 * 60_000)
-      if (fireAt > new Date()) {
-        await upsertReminder(
-          tender.orgId,
-          tender.id,
-          "BRIEFING_SESSION",
+        await scheduleWatchlistReminderForWatchingOrgs({
+          tenderId: tender.id,
+          reminderType,
           fireAt,
-        )
+        })
       }
     }
 
     if (siteVisitAt) {
       const fireAt = new Date(siteVisitAt.getTime() - 24 * 60 * 60_000)
       if (fireAt > new Date()) {
-        await upsertReminder(tender.orgId, tender.id, "SITE_VISIT", fireAt)
+        await scheduleWatchlistReminderForWatchingOrgs({
+          tenderId: tender.id,
+          reminderType: "SITE_VISIT",
+          fireAt,
+        })
       }
     }
   }

@@ -4,12 +4,15 @@ import * as React from "react";
 import { toast } from "sonner";
 import { TLSection } from "@/components/tenderlens/section";
 import { TLButton } from "@/components/tenderlens/button";
-import { getReferralSummary } from "@/lib/referrals.api";
+import {
+  getReferralSummary,
+  type ReferralSummaryItem,
+} from "@/lib/referrals.api";
 import { markEarningPaid } from "@/lib/referral-payouts.api";
 
 export default function AdminReferralsPage() {
   const [loading, setLoading] = React.useState(true);
-  const [items, setItems] = React.useState<any[]>([]);
+  const [items, setItems] = React.useState<ReferralSummaryItem[]>([]);
 
   async function load() {
     setLoading(true);
@@ -66,7 +69,7 @@ export default function AdminReferralsPage() {
                     Code
                   </th>
                   <th className="text-left p-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground">
-                    Stripe sub
+                    Billing Ref
                   </th>
                   <th className="text-left p-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground">
                     Status
@@ -77,7 +80,7 @@ export default function AdminReferralsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {items.map((r: any, idx: number) => (
+                {items.map((r, idx: number) => (
                   <tr
                     key={r.id || idx}
                     className="hover:bg-muted/30 transition-colors"
@@ -94,7 +97,7 @@ export default function AdminReferralsPage() {
                     </td>
                     <td className="p-4">
                       <span className="text-[10px] text-muted-foreground font-mono">
-                        {r.stripeSubscriptionId ?? "-"}
+                        {r.billingReference ?? "-"}
                       </span>
                     </td>
                     <td className="p-4">

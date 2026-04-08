@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { TLInlineAlert } from "@/components/tenderlens/inline-alert";
 import { getMyPrefs, updateMyPrefs } from "@/lib/preferences.api";
 import type { NotificationPrefs } from "@/lib/preferences.types";
-import { TLWhatsAppVerifyPanel } from "@/components/tenderlens/whatsapp-verify-panel";
+import { TLSmsVerifyPanel } from "@/components/tenderlens/sms-verify-panel";
 import { useUsage } from "@/hooks/use-usage";
 import {
   Bell,
@@ -167,7 +167,7 @@ export default function NotificationSettingsPage() {
 
                   {prefs ? (
                     <div className="space-y-2">
-                      <TLWhatsAppVerifyPanel
+                      <TLSmsVerifyPanel
                         prefs={prefs}
                         disabled={usage?.limits.whatsappEnabled === false}
                         onPatch={(p) => patch(p)}

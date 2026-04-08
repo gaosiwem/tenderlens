@@ -1,202 +1,438 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  BellRing,
+  Building2,
+  CheckCircle2,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import { toast } from "sonner";
 import { TenderLensAppShell } from "@/components/tenderlens/app-shell";
 import { TLSection } from "@/components/tenderlens/section";
-import { TenderLensStatCard } from "@/components/tenderlens/stat-card";
-import { TLTableShell } from "@/components/tenderlens/table-shell";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useAuth } from "@/lib/auth";
 import { TLEmptyState } from "@/components/tenderlens/empty-state";
 import { TLCardSkeleton } from "@/components/tenderlens/skeleton-blocks";
-import { useBilling } from "@/hooks/use-billing";
 import { TLTrialBanner } from "@/components/tenderlens/trial-banner";
 import { TLOnboardingChecklist } from "@/components/tenderlens/onboarding-checklist";
-import { useOnboardingChecklist } from "@/hooks/use-onboarding-checklist";
-import { listNotificationEvents } from "@/lib/notifications.api";
-import { getActiveOrgId } from "@/lib/api";
 import { TLRetentionBanner } from "@/components/tenderlens/retention-banner";
 import { TLButton } from "@/components/tenderlens/button";
-import Link from "next/link";
-import { Sparkles } from "lucide-react";
-import { useUpgradeOffers } from "@/hooks/use-upgrade-offers";
 import { TLUpgradeOfferBanner } from "@/components/tenderlens/upgrade-offer-banner";
-import { toast } from "sonner";
+import { TLDashboardHero } from "@/components/tenderlens/dashboard-hero";
+import { TLDashboardMetricCard } from "@/components/tenderlens/dashboard-metric-card";
+import {
+  TLDashboardAttentionPanel,
+  type AttentionItem,
+} from "@/components/tenderlens/dashboard-attention-panel";
+import { TLDashboardOrgSwitchboard } from "@/components/tenderlens/dashboard-org-switchboard";
+import { TLDashboardSignalsCard } from "@/components/tenderlens/dashboard-signals-card";
+import { useAuth } from "@/lib/auth";
+import { getActiveOrgId } from "@/lib/api";
+import { useBilling } from "@/hooks/use-billing";
+import { useOnboardingChecklist } from "@/hooks/use-onboarding-checklist";
+import { listNotificationEvents } from "@/lib/notifications.api";
+import { useUpgradeOffers } from "@/hooks/use-upgrade-offers";
+import { formatPlanDisplayName } from "@/lib/billing.types";
+import type { NotificationEvent } from "@/lib/notifications.types";
 
 export default function DashboardPage() {
   const auth = useAuth();
-  const { subscription } = useBilling();
+  const router = useRouter();
+  const { subscription, reload: reloadBilling } = useBilling();
   const {
     items: checklistItems,
     reload: reloadChecklist,
     completedCount,
   } = useOnboardingChecklist();
-  const [retentionEvent, setRetentionEvent] = React.useState<any>(null);
-
-  React.useEffect(() => {
-    if (!auth.isReady || !getActiveOrgId()) return;
-    (async () => {
-      const r = await listNotificationEvents(20);
-      if (r.ok) {
-        const latestRetention = r.data.items.find((it: any) =>
-          it.meta?.kind?.startsWith("RETENTION_"),
-        );
-        setRetentionEvent(latestRetention);
-      }
-    })();
-  }, [auth.isReady]);
-
-  if (!auth.isReady) {
-    return (
-      <TenderLensAppShell title="TenderLens" subtitle="Dashboard">
-        <TLCardSkeleton />
-      </TenderLensAppShell>
-    );
-  }
-
-  const orgCount = auth.me?.orgs.length ?? 0;
-  const activeOrgId =
-    typeof window !== "undefined"
-      ? window.localStorage.getItem("tl_active_org_id")
-      : null;
-  const activeOrg = auth.me?.orgs.find((o) => o.org.id === activeOrgId)?.org;
-
-  const isTrial = subscription?.status === "TRIALING";
-
   const {
     items: offers,
     track: trackOffer,
     reload: reloadOffers,
   } = useUpgradeOffers();
-  const offer = offers?.[0];
+
+  const [activeOrgId, setActiveOrgId] = React.useState<string | null>(null);
+  const [events, setEvents] = React.useState<NotificationEvent[]>([]);
+  const [retentionEvent, setRetentionEvent] =
+    React.useState<NotificationEvent | null>(null);
+
+  React.useEffect(() => {
+    if (!auth.isReady) return;
+    setActiveOrgId(getActiveOrgId());
+  }, [auth.isReady]);
+
+  const loadSignals = React.useCallback(async () => {
+    if (!auth.isReady || !getActiveOrgId()) {
+      setEvents([]);
+      setRetentionEvent(null);
+      return;
+    }
+
+    const result = await listNotificationEvents(20);
+    if (!result.ok) {
+      setEvents([]);
+      setRetentionEvent(null);
+      return;
+    }
+
+    setEvents(result.data.items);
+    const latestRetention =
+      result.data.items.find((event) => {
+        const meta =
+          event.meta &&
+          typeof event.meta === "object" &&
+          !Array.isArray(event.meta)
+            ? (event.meta as Record<string, unknown>)
+            : null;
+        return typeof meta?.kind === "string" && meta.kind.startsWith("RETENTION_");
+      }) ?? null;
+    setRetentionEvent(latestRetention);
+  }, [auth.isReady]);
+
+  React.useEffect(() => {
+    void loadSignals();
+  }, [loadSignals, activeOrgId]);
+
+  if (!auth.isReady) {
+    return (
+      <TenderLensAppShell title="Operations Desk" subtitle="Dashboard">
+        <TLCardSkeleton />
+      </TenderLensAppShell>
+    );
+  }
+
+  const activeMembership =
+    auth.me?.orgs.find((membership) => membership.org.id === activeOrgId) ??
+    auth.me?.orgs[0] ??
+    null;
+  const activeOrg = activeMembership?.org ?? null;
+  const orgCount = auth.me?.orgs.length ?? 0;
+  const isEmailVerified = Boolean(auth.me?.user.emailVerifiedAt);
+  const offer = offers[0];
+  const isTrial = subscription?.status === "TRIALING";
+  const checklistTotal = checklistItems.length;
+  const checklistRemaining = Math.max(0, checklistTotal - completedCount);
+  const planLabel = formatPlanDisplayName(subscription?.plan, subscription?.status);
+  const trialDaysLeft =
+    subscription?.trialEndsAt != null
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(subscription.trialEndsAt).getTime() - Date.now()) /
+              (1000 * 60 * 60 * 24),
+          ),
+        )
+      : null;
+  const signalCount = events.length;
+  const readinessLabel =
+    checklistTotal > 0
+      ? `${completedCount}/${checklistTotal} steps done`
+      : "Ready for first action";
+
+  const rawAttentionItems: Array<AttentionItem | null> = [
+    !isEmailVerified
+      ? {
+          title: "Verify your email address",
+          description:
+            "A verified inbox keeps billing updates, invites, and deadline reminders flowing to the right place.",
+          href: "/settings/business",
+          ctaLabel: "Open settings",
+          tone: "warning" as const,
+        }
+      : null,
+    checklistTotal > 0 && checklistRemaining > 0
+      ? {
+          title: `Finish ${checklistRemaining} onboarding ${
+            checklistRemaining === 1 ? "step" : "steps"
+          }`,
+          description:
+            "Complete your setup so this dashboard reflects a live tender workflow instead of a placeholder shell.",
+          href: "/dashboard",
+          ctaLabel: "Continue setup",
+          tone: "default" as const,
+        }
+      : null,
+    subscription?.status === "EXPIRED"
+      ? {
+          title: "Your trial has expired",
+          description:
+            "Upgrade to restore full access to workspace, exports, and the premium tools you already started using.",
+          href: "/pricing",
+          ctaLabel: "View plans",
+          tone: "warning" as const,
+        }
+      : isTrial
+        ? {
+            title:
+              trialDaysLeft != null && trialDaysLeft <= 3
+                ? `Trial ends in ${trialDaysLeft} ${
+                    trialDaysLeft === 1 ? "day" : "days"
+                  }`
+                : "Use your trial with intent",
+            description:
+              trialDaysLeft != null && trialDaysLeft <= 3
+                ? "This is the right moment to lock in your workflow before access tightens."
+                : "The more of the workflow you touch now, the more relevant the dashboard becomes.",
+            href: "/pricing",
+            ctaLabel: "Compare plans",
+            tone:
+              trialDaysLeft != null && trialDaysLeft <= 3
+                ? ("warning" as const)
+                : ("default" as const),
+          }
+        : null,
+    offer
+      ? {
+          title: offer.title,
+          description: offer.description,
+          href: "/settings/billing",
+          ctaLabel: offer.ctaLabel,
+          tone: "default" as const,
+        }
+      : null,
+    {
+      title: "Keep your tender pipeline active",
+      description:
+        "Browse live tenders, open workspaces, and switch organizations to turn this dashboard into a proper control surface.",
+      href: "/tenders",
+      ctaLabel: "Browse tenders",
+      tone: "success" as const,
+    },
+  ];
+  const attentionItems = rawAttentionItems.filter(Boolean) as AttentionItem[];
+
+  async function handleSwitchOrg(orgId: string) {
+    if (typeof window === "undefined") return;
+    if (orgId === activeOrgId) return;
+
+    window.localStorage.setItem("tl_active_org_id", orgId);
+    setActiveOrgId(orgId);
+    await Promise.all([
+      reloadBilling(),
+      reloadChecklist(),
+      reloadOffers(),
+      loadSignals(),
+    ]);
+    router.refresh();
+    toast.success("Organization context updated");
+  }
 
   return (
-    <TenderLensAppShell title="TenderLens" subtitle="Dashboard">
+    <TenderLensAppShell
+      title="Operations Desk"
+      subtitle={activeOrg?.name ? `Watching ${activeOrg.name}` : "Dashboard"}
+      description="A clearer view of account health, setup progress, and the next move."
+    >
       <div className="space-y-6">
-        {offer ? (
-          <TLUpgradeOfferBanner
-            offer={offer}
-            onTrack={async (name) => {
-              await trackOffer(offer.id, name, { source: "dashboard" });
-              if (name === "dismiss" || name === "accept") reloadOffers();
-            }}
+        <TLDashboardHero
+          greeting={
+            auth.me?.user.name ? `Welcome back, ${auth.me.user.name}` : "Welcome back"
+          }
+          headline={
+            activeOrg
+              ? `Run the next move for ${activeOrg.name}`
+              : "Turn this dashboard into your tender command center"
+          }
+          description={
+            activeOrg
+              ? "Track plan health, setup progress, and commercial signals from one place so you always know what deserves attention next."
+              : "Choose an organization, complete the setup, and start shaping a dashboard that reflects how your team actually works."
+          }
+          planLabel={`${planLabel}${
+            subscription?.status ? ` · ${subscription.status.replaceAll("_", " ")}` : ""
+          }`}
+          planTone={
+            subscription?.status === "EXPIRED"
+              ? "danger"
+              : subscription?.status === "TRIALING"
+                ? "warning"
+                : "success"
+          }
+          roleLabel={activeMembership ? `${activeMembership.role} access` : "No active role"}
+          activeOrgLabel={activeOrg?.name ?? "No active organization"}
+          verificationLabel={isEmailVerified ? "Email verified" : "Verification pending"}
+          readinessLabel={readinessLabel}
+          actions={[
+            { href: "/tenders", label: "Browse tenders" },
+            {
+              href:
+                subscription?.status === "EXPIRED" || subscription?.status === "TRIALING"
+                  ? "/pricing"
+                  : "/orgs",
+              label:
+                subscription?.status === "EXPIRED" || subscription?.status === "TRIALING"
+                  ? "Review plans"
+                  : "Manage organizations",
+              variant: "secondary",
+            },
+          ]}
+        />
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <TLDashboardMetricCard
+            label="Organization Access"
+            value={`${orgCount}`}
+            sublabel={
+              activeOrg
+                ? `${activeOrg.name} is currently in focus`
+                : "Choose an organization to begin"
+            }
+            icon={Building2}
           />
-        ) : null}
+          <TLDashboardMetricCard
+            label="Plan Status"
+            value={planLabel}
+            sublabel={
+              subscription?.status === "TRIALING" && trialDaysLeft != null
+                ? `${trialDaysLeft} ${trialDaysLeft === 1 ? "day" : "days"} left in trial`
+                : subscription?.status?.replaceAll("_", " ") ?? "No active billing state"
+            }
+            icon={ShieldCheck}
+            accentClassName="from-primary via-primary/80 to-blue-300"
+          />
+          <TLDashboardMetricCard
+            label="Setup Progress"
+            value={checklistTotal > 0 ? `${completedCount}/${checklistTotal}` : "0/0"}
+            sublabel={
+              checklistTotal > 0
+                ? `${checklistRemaining} ${checklistRemaining === 1 ? "step" : "steps"} still open`
+                : "Checklist appears once onboarding starts"
+            }
+            icon={CheckCircle2}
+            accentClassName="from-emerald-500 via-emerald-400 to-emerald-200"
+          />
+          <TLDashboardMetricCard
+            label="Recent Signals"
+            value={`${signalCount}`}
+            sublabel={
+              signalCount > 0
+                ? "Notifications, offers, and retention cues are flowing in"
+                : "No recent signal history yet"
+            }
+            icon={BellRing}
+            accentClassName="from-amber-500 via-amber-400 to-amber-200"
+          />
+        </div>
 
-        {subscription &&
-        (subscription.status === "TRIALING" ||
-          subscription.status === "EXPIRED") ? (
-          <TLTrialBanner sub={subscription} />
-        ) : null}
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
+          <div className="space-y-6">
+            <TLSection
+              title="What Needs Attention"
+              description="A short list of actions that make the dashboard more useful fast."
+            >
+              <TLDashboardAttentionPanel items={attentionItems} />
+            </TLSection>
 
-        {retentionEvent && <TLRetentionBanner event={retentionEvent} />}
+            {isTrial ? (
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)]">
+                <TLOnboardingChecklist
+                  items={checklistItems}
+                  onChanged={reloadChecklist}
+                />
+                <div className="rounded-3xl border border-primary/20 bg-linear-to-b from-primary/10 via-background/80 to-background p-6 text-center shadow-lg shadow-primary/5">
+                  <div className="flex justify-center">
+                    <div className="rounded-full bg-primary/10 p-3 text-primary">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <div className="font-display text-xl font-extrabold">
+                      {completedCount >= 3 ? "Momentum unlocked" : "Build the first workflow"}
+                    </div>
+                    <div className="text-sm leading-6 text-muted-foreground">
+                      {completedCount >= 3
+                        ? "You have enough setup in place to see the product’s shape. Lock in access before the trial window closes."
+                        : `Complete ${Math.max(1, 3 - completedCount)} more ${
+                            Math.max(1, 3 - completedCount) === 1 ? "step" : "steps"
+                          } to make this dashboard reflect a live tender workflow.`}
+                    </div>
+                  </div>
+                  <Link href="/pricing" className="mt-5 block">
+                    <TLButton className="w-full">Upgrade to Pro</TLButton>
+                  </Link>
+                </div>
+              </div>
+            ) : null}
 
-        {isTrial && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <TLOnboardingChecklist
-                items={checklistItems}
-                onChanged={reloadChecklist}
+            <TLSection
+              title="Signals"
+              description="Commercial nudges, subscription pressure, and recent platform activity."
+            >
+              <div className="grid gap-4">
+                {offer ? (
+                  <TLUpgradeOfferBanner
+                    offer={offer}
+                    onTrack={async (name) => {
+                      await trackOffer(offer.id, name, { source: "dashboard" });
+                      if (name === "dismiss" || name === "accept") {
+                        reloadOffers();
+                      }
+                    }}
+                  />
+                ) : null}
+
+                {subscription &&
+                (subscription.status === "TRIALING" ||
+                  subscription.status === "EXPIRED") ? (
+                  <TLTrialBanner sub={subscription} />
+                ) : null}
+
+                {retentionEvent ? <TLRetentionBanner event={retentionEvent} /> : null}
+
+                <TLDashboardSignalsCard events={events} />
+              </div>
+            </TLSection>
+          </div>
+
+          <div className="space-y-6">
+            {orgCount === 0 ? (
+              <TLEmptyState
+                title="No organizations yet"
+                description="Create your first organization to turn this dashboard into a working control surface."
+                actionLabel="Go to Organizations"
+                onAction={() => (window.location.href = "/orgs")}
               />
-            </div>
-            <div className="flex flex-col justify-center p-6 rounded-2xl border border-primary/20 bg-primary/5 text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="p-3 rounded-full bg-primary/10">
-                  <Sparkles className="h-6 w-6 text-primary" />
-                </div>
-              </div>
+            ) : (
+              <TLDashboardOrgSwitchboard
+                orgs={auth.me?.orgs ?? []}
+                activeOrgId={activeOrgId}
+                onSelectOrg={handleSwitchOrg}
+              />
+            )}
+
+            <div className="rounded-3xl border border-border/70 bg-card p-6 shadow-sm">
               <div className="space-y-1">
-                <div className="font-display font-bold">
-                  {completedCount >= 3 ? "You're ready!" : "Almost there"}
+                <div className="font-display text-lg font-extrabold">
+                  Fast Actions
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {completedCount >= 3
-                    ? "You've seen the core value of TenderLens. Upgrade now to keep these features forever."
-                    : `Complete ${3 - completedCount} more ${3 - completedCount === 1 ? "task" : "tasks"} to unlock the full potential of your trial.`}
+                <div className="text-sm text-muted-foreground">
+                  Jump straight into the areas that make this page feel alive.
                 </div>
               </div>
-              <Link href="/pricing" className="block">
-                <TLButton className="w-full">Upgrade to Pro</TLButton>
-              </Link>
+              <div className="mt-5 grid gap-3">
+                <Link href="/tenders">
+                  <TLButton
+                    className="w-full justify-between"
+                    rightIcon={<Sparkles className="h-4 w-4" />}
+                  >
+                    Browse open tenders
+                  </TLButton>
+                </Link>
+                <Link href="/orgs">
+                  <TLButton variant="secondary" className="w-full">
+                    Manage organizations
+                  </TLButton>
+                </Link>
+                <Link href="/pricing">
+                  <TLButton variant="ghost" className="w-full">
+                    Review plans and pricing
+                  </TLButton>
+                </Link>
+              </div>
             </div>
           </div>
-        )}
-
-        <TLSection
-          title="Overview"
-          description="Baseline workspace health. Upload and analysis arrive in Sprint 2."
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <TenderLensStatCard
-              label="Organizations"
-              value={`${orgCount}`}
-              sublabel="Memberships linked to your account"
-            />
-            <TenderLensStatCard
-              label="Active org"
-              value={activeOrg?.name ?? "None"}
-              sublabel="Selected context for actions"
-            />
-            <TenderLensStatCard
-              label="Uploads"
-              value="0"
-              sublabel="Not available in Sprint 1"
-            />
-            <TenderLensStatCard
-              label="Analyses"
-              value="0"
-              sublabel="Not available in Sprint 1"
-            />
-          </div>
-        </TLSection>
-
-        <TLSection
-          title="Your organizations"
-          description="Switch context in the Organizations screen."
-        >
-          {orgCount === 0 ? (
-            <TLEmptyState
-              title="No organizations yet"
-              description="Create your first organization to continue."
-              actionLabel="Go to Organizations"
-              onAction={() => (window.location.href = "/orgs")}
-            />
-          ) : (
-            <TLTableShell title="Organizations">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>Role</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {auth.me?.orgs.map((o) => (
-                    <TableRow key={o.org.id}>
-                      <TableCell className="font-semibold">
-                        {o.org.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {o.org.slug}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {o.role}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TLTableShell>
-          )}
-        </TLSection>
+        </div>
       </div>
     </TenderLensAppShell>
   );

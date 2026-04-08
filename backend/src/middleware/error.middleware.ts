@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express"
 import { AppError, fail } from "../utils/responses"
 import { logger } from "../utils/logger"
 import { metrics } from "../utils/metrics"
+import { captureApiException } from "../monitoring/sentry"
 
 function isDatabaseUnavailableError(err: unknown) {
   const code =
@@ -40,6 +41,35 @@ function isJsonParseError(err: unknown) {
   return false
 }
 
+function shouldCaptureAppError(err: AppError) {
+  if (err.status >= 500) return true
+
+  const ignoredCodes = new Set([
+    "VALIDATION_ERROR",
+    "BAD_REQUEST",
+    "INVALID",
+    "INVALID_TOKEN",
+    "LIMIT",
+    "INVITE_EXPIRED",
+    "INVALID_STATE",
+    "CONFLICT",
+    "UNAUTHORIZED",
+    "FORBIDDEN",
+    "NOT_FOUND",
+    "EXPIRED",
+    "LOCKED",
+    "RATE_LIMITED",
+    "PLAN_UPGRADE_REQUIRED",
+    "PAYMENT_REQUIRED",
+    "TRIAL_EXPIRED",
+    "PLAN_EXPIRED",
+    "PLAN_PAST_DUE",
+    "USAGE_LIMIT_REACHED",
+  ])
+
+  return !ignoredCodes.has(err.code)
+}
+
 export function errorMiddleware(err: unknown, req: Request, res: Response, _next: NextFunction) {
   const requestId = req.requestId
   const method = req.method
@@ -51,12 +81,24 @@ export function errorMiddleware(err: unknown, req: Request, res: Response, _next
       { requestId, method, path, code: err.code, status: err.status, details: err.details },
       err.message,
     )
+    if (shouldCaptureAppError(err)) {
+      captureApiException(err, req, {
+        code: err.code,
+        handled: true,
+        level: err.status >= 500 ? "error" : "warning",
+      })
+    }
     return res.status(err.status).json(fail(err.code, err.message, err.details))
   }
 
   if (isDatabaseUnavailableError(err)) {
     metrics.errorCount("NOT_READY")
     logger.warn({ requestId, method, path, err }, "Database unavailable")
+    captureApiException(err, req, {
+      code: "NOT_READY",
+      handled: true,
+      level: "warning",
+    })
     return res.status(503).json(fail("NOT_READY", "Database unavailable"))
   }
 
@@ -70,6 +112,11 @@ export function errorMiddleware(err: unknown, req: Request, res: Response, _next
 
   metrics.errorCount("INTERNAL_ERROR")
   logger.error({ requestId, method, path, err }, "Unhandled error")
+  captureApiException(err, req, {
+    code: "INTERNAL_ERROR",
+    handled: false,
+    level: "error",
+  })
   return res.status(500).json(
     fail("INTERNAL_ERROR", "Something went wrong", { requestId }),
   )

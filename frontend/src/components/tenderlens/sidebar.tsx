@@ -18,12 +18,14 @@ import {
   Sparkles,
   Handshake,
   BarChart3,
+  KanbanSquare,
   ChevronDown,
   BriefcaseBusiness,
   Terminal,
   Zap,
   Activity,
   Settings,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -36,9 +38,10 @@ import { BrandLogo } from "./brand-logo";
 
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/workspace", label: "Workspaces", icon: KanbanSquare },
   { href: "/tenders?lifecycle=open", label: "Open Tenders", icon: FileText },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
-  { href: "/watchlist/templates", label: "Templates", icon: FileText },
+  { href: "/watchlist/templates", label: "Categories", icon: FileText },
   { href: "/awarded", label: "Awarded", icon: Shield },
   { href: "/closed", label: "Closed", icon: AlertCircle },
   { href: "/cancelled", label: "Cancelled", icon: AlertCircle },
@@ -53,6 +56,7 @@ const settingsItems = [
     label: "Business Docs",
     icon: BriefcaseBusiness,
   },
+  { href: "/settings/members", label: "Members", icon: Users },
   { href: "/settings/business", label: "Business", icon: Building2 },
   { href: "/settings/billing", label: "Billing", icon: CreditCard },
   { href: "/settings/notifications", label: "Notifications", icon: Bell },
@@ -61,6 +65,7 @@ const settingsItems = [
 
 const adminItems = [
   { href: "/admin", label: "Command Center", icon: Terminal },
+  { href: "/workspace", label: "Workspaces", icon: KanbanSquare },
   { href: "/tenders?lifecycle=open", label: "Open Tenders", icon: FileText },
   { href: "/awarded", label: "Awarded", icon: Shield },
   { href: "/closed", label: "Closed", icon: AlertCircle },
@@ -189,18 +194,20 @@ export function TenderLensSidebar() {
 
   return (
     <aside className="tl-surface p-4 h-full flex flex-col overflow-y-auto">
-      <div className="mb-6 flex items-start justify-between gap-3 px-2">
-        <BrandLogo priority size="sidebar" className="min-w-0" />
-        {(subscription?.plan || isAdmin) ? (
-          <TLCodeBadge
-            value={formatPlanBadgeLabel({
-              plan: subscription?.plan,
-              status: subscription?.status,
-              isAdmin,
-            })}
-            className="bg-primary/10 text-primary border-primary/20 scale-90"
-          />
-        ) : null}
+      <div className="mb-6 px-2">
+        <div className="flex flex-col items-center gap-2">
+          <BrandLogo priority size="sidebar" className="min-w-0" />
+          {(subscription?.plan || isAdmin) ? (
+            <TLCodeBadge
+              value={formatPlanBadgeLabel({
+                plan: subscription?.plan,
+                status: subscription?.status,
+                isAdmin,
+              })}
+              className="bg-primary/10 text-primary border-primary/20 scale-90"
+            />
+          ) : null}
+        </div>
       </div>
 
       <div className="flex-1 space-y-2">

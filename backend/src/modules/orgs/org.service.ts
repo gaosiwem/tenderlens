@@ -56,6 +56,21 @@ export async function getOrg(orgId: string) {
   return org
 }
 
+export async function updateOrg(orgId: string, name: string) {
+  const org = await prisma.organization.findUnique({ where: { id: orgId } })
+  if (!org) throw new AppError("NOT_FOUND", "Organization not found", 404)
+
+  const trimmedName = name.trim()
+  if (!trimmedName) {
+    throw new AppError("VALIDATION_ERROR", "Organization name is required", 400)
+  }
+
+  return prisma.organization.update({
+    where: { id: orgId },
+    data: { name: trimmedName },
+  })
+}
+
 export async function listMembers(orgId: string) {
   const members = await prisma.membership.findMany({
     where: { orgId },

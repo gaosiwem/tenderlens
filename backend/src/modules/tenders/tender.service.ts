@@ -11,6 +11,8 @@ import { ORG_PROFILE_TENDER_SOURCE } from "../orgDocs/orgDocs.constants"
 import crypto from "crypto"
 import { logTenderChange } from "./changeLog.service"
 import { emitEvent } from "../notifications/notifications.service"
+import { storage } from "../storage/storage"
+import { sha256 } from "../../utils/hash"
 
 const ETENDERS_DEFAULT_URL =
   "https://www.etenders.gov.za/Home/PaginatedTenderOpportunities?draw=2&columns%5B0%5D%5Bdata%5D=&columns%5B0%5D%5Bname%5D=&columns%5B0%5D%5Bsearchable%5D=true&columns%5B0%5D%5Borderable%5D=false&columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B1%5D%5Bdata%5D=category&columns%5B1%5D%5Bname%5D=&columns%5B1%5D%5Bsearchable%5D=true&columns%5B1%5D%5Borderable%5D=true&columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B2%5D%5Bdata%5D=description&columns%5B2%5D%5Bname%5D=&columns%5B2%5D%5Bsearchable%5D=true&columns%5B2%5D%5Borderable%5D=false&columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B3%5D%5Bdata%5D=eSubmission&columns%5B3%5D%5Bname%5D=&columns%5B3%5D%5Bsearchable%5D=true&columns%5B3%5D%5Borderable%5D=true&columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B4%5D%5Bdata%5D=date_Published&columns%5B4%5D%5Bname%5D=&columns%5B4%5D%5Bsearchable%5D=true&columns%5B4%5D%5Borderable%5D=true&columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B5%5D%5Bdata%5D=closing_Date&columns%5B5%5D%5Bname%5D=&columns%5B5%5D%5Bsearchable%5D=true&columns%5B5%5D%5Borderable%5D=true&columns%5B5%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B5%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B6%5D%5Bdata%5D=actions&columns%5B6%5D%5Bname%5D=&columns%5B6%5D%5Bsearchable%5D=true&columns%5B6%5D%5Borderable%5D=true&columns%5B6%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B6%5D%5Bsearch%5D%5Bregex%5D=false&order%5B0%5D%5Bcolumn%5D=2&order%5B0%5D%5Bdir%5D=desc&start=0&length=1000&search%5Bvalue%5D=&search%5Bregex%5D=false&status=1&_=1745490004518"
@@ -134,6 +136,11 @@ type PersistedExternalTenderDocument = {
   id: string
   name: string
   path: string
+  archivedStorageKey: string | null
+  archivedMimeType: string | null
+  archivedSizeBytes: number | null
+  archivedChecksumSha256: string | null
+  archivedAt: string | null
 }
 
 type ListTenderRow = {
@@ -147,6 +154,9 @@ type ListTenderRow = {
   updatedAt: Date
   deadlineClosingAt: Date | null
   tenderClosingDate: string | null
+  lifecycle: string | null
+  lifecycleDetectedAt: Date | null
+  lifecycleDateSource: string | null
   companyName: string | null
   scrapedStatus: string | null
   amount: string | null
@@ -180,6 +190,70 @@ const ETENDERS_RECREATED_FILE_TAG = /\s\[etenders:[^\]]+\]\s*$/i
 const GENERATED_FILE_MARKER = /\(generated\)/i
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const ETENDERS_FEED_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+function parsePositiveInt(
+  raw: string | undefined,
+  fallback: number,
+  min = 1,
+  max = Number.POSITIVE_INFINITY,
+) {
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed)) return fallback
+  const rounded = Math.floor(parsed)
+  if (rounded < min || rounded > max) return fallback
+  return rounded
+}
+
+const ETENDERS_FEED_FETCH_ATTEMPTS = parsePositiveInt(
+  process.env.ETENDERS_FEED_FETCH_ATTEMPTS,
+  6,
+  1,
+  12,
+)
+const ETENDERS_FEED_FETCH_TIMEOUT_MS = parsePositiveInt(
+  process.env.ETENDERS_FEED_FETCH_TIMEOUT_MS,
+  45000,
+  5000,
+  180000,
+)
+const ETENDERS_FEED_RETRY_BASE_DELAY_MS = parsePositiveInt(
+  process.env.ETENDERS_FEED_RETRY_BASE_DELAY_MS,
+  1500,
+  100,
+  30000,
+)
+const ETENDERS_IMPORT_BATCH_SIZE = parsePositiveInt(
+  process.env.ETENDERS_IMPORT_BATCH_SIZE,
+  100,
+  1,
+  500,
+)
+const ETENDERS_IMPORT_CANCELLED_BATCH_SIZE = parsePositiveInt(
+  process.env.ETENDERS_IMPORT_CANCELLED_BATCH_SIZE,
+  25,
+  1,
+  250,
+)
+const EXTERNAL_TENDER_ARCHIVE_FETCH_TIMEOUT_MS = parsePositiveInt(
+  process.env.EXTERNAL_TENDER_ARCHIVE_FETCH_TIMEOUT_MS,
+  15000,
+  3000,
+  120000,
+)
+const EXTERNAL_TENDER_ARCHIVE_MAX_BYTES = parsePositiveInt(
+  process.env.EXTERNAL_TENDER_ARCHIVE_MAX_BYTES,
+  52428800,
+  1024,
+  262144000,
+)
+
+const EXTERNAL_TENDER_ARCHIVABLE_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+])
 
 function isHiddenTenderFileForUser(filename: string) {
   const name = (filename ?? "").trim()
@@ -236,6 +310,73 @@ function decodeDownloadedFileNameFromPath(pathValue: string) {
   }
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function mimeFromFilename(name: string) {
+  const lower = name.toLowerCase().trim()
+  if (lower.endsWith(".pdf")) return "application/pdf"
+  if (lower.endsWith(".docx")) {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  }
+  if (lower.endsWith(".txt")) return "text/plain"
+  return ""
+}
+
+function pickExternalDocumentMimeType(
+  contentType: string | null | undefined,
+  fileName: string,
+) {
+  const ctype = (contentType ?? "").split(";")[0]?.trim().toLowerCase()
+  if (ctype && EXTERNAL_TENDER_ARCHIVABLE_MIME_TYPES.has(ctype)) return ctype
+  return mimeFromFilename(fileName)
+}
+
+function looksLikeHtmlDocument(buf: Buffer) {
+  const head = buf.slice(0, 1024).toString("utf-8").toLowerCase()
+  return (
+    head.includes("<!doctype html") ||
+    head.includes("<html") ||
+    head.includes("<head") ||
+    head.includes("<body")
+  )
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message
+  return String(error)
+}
+
+function isRetriableETendersFetchError(error: unknown) {
+  if (!error || typeof error !== "object") return false
+
+  const candidate = error as {
+    name?: string
+    code?: string
+    cause?: {
+      code?: string
+      name?: string
+    }
+  }
+
+  if (candidate.name === "TimeoutError") return true
+
+  const code = candidate.code ?? candidate.cause?.code ?? ""
+  if (
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    code === "UND_ERR_HEADERS_TIMEOUT" ||
+    code === "UND_ERR_BODY_TIMEOUT" ||
+    code === "ETIMEDOUT" ||
+    code === "ECONNRESET" ||
+    code === "EAI_AGAIN"
+  ) {
+    return true
+  }
+
+  return false
+}
+
 function normalizeExternalDocumentName(args: {
   id: string
   name: string
@@ -272,6 +413,13 @@ export function deriveDisplayFilename(args: {
   }
 
   return candidate
+}
+
+function buildArchivedExternalDocumentDownloadPath(args: {
+  tenderId: string
+  documentId: string
+}) {
+  return `/api/v1/tenders/${encodeURIComponent(args.tenderId)}/external-documents/${encodeURIComponent(args.documentId)}/download`
 }
 
 function emptyScrapedData(input?: {
@@ -362,7 +510,10 @@ function inferLifecycleDateInfo(args: {
   closingDate?: string | null
   lifecycleDetectedAt?: Date | null
   lifecycleDateSource?: string | null
-}) {
+}): {
+  date: Date | null
+  source: TenderLifecycleDateSource
+} {
   const persistedSource = normalizeLifecycleDateSource(args.lifecycleDateSource)
   if (args.lifecycle === "awarded") {
     return {
@@ -372,17 +523,22 @@ function inferLifecycleDateInfo(args: {
   }
 
   const closingAt = parseDateLike(args.closingDate)
+  if (
+    args.lifecycle === "cancelled" &&
+    persistedSource === "cancelled_date" &&
+    args.lifecycleDetectedAt
+  ) {
+    return {
+      date: args.lifecycleDetectedAt,
+      source: "cancelled_date",
+    }
+  }
+
   if (closingAt) {
     return {
       date: closingAt,
       source:
-        args.lifecycle === "cancelled"
-          ? persistedSource === "unknown"
-            ? "cancelled_date"
-            : persistedSource
-          : persistedSource === "unknown"
-            ? "closing_date"
-            : persistedSource,
+        persistedSource === "unknown" ? "closing_date" : persistedSource,
     }
   }
 
@@ -639,7 +795,15 @@ async function loadTenderLifecycleSnapshot(
   }
 }
 
-async function loadTenderLifecycleState(tenderId: string) {
+async function loadTenderLifecycleState(
+  tenderId: string,
+): Promise<{
+  scraped: TenderScrapedSnapshotRow | null
+  lifecycle: TenderLifecycle
+  lifecycleDetectedAt: Date | null
+  lifecycleDateSource: TenderLifecycleDateSource
+  lifecycleDate: Date | null
+}> {
   const [scraped, lifecycle] = await Promise.all([
     loadTenderScrapedSnapshot(tenderId),
     loadTenderLifecycleSnapshot(tenderId),
@@ -730,7 +894,12 @@ async function updateTenderScrapedFields(args: {
   orgId?: string
   payload: ReturnType<typeof mapRowToScrapedPayload>
 }) {
-  const documentsJson = JSON.stringify(args.payload.documents ?? [])
+  const previousScrapedSnapshot = await loadTenderScrapedSnapshot(args.tenderId)
+  const mergedDocuments = mergePersistedExternalDocuments(
+    parsePersistedExternalDocumentRecords(previousScrapedSnapshot?.documents),
+    args.payload.documents ?? [],
+  )
+  const documentsJson = JSON.stringify(mergedDocuments)
   const supportsLifecycleColumns = await hasTenderLifecycleColumns()
   const previousLifecycleState = supportsLifecycleColumns
     ? await loadTenderLifecycleState(args.tenderId)
@@ -738,7 +907,8 @@ async function updateTenderScrapedFields(args: {
   const lifecyclePayload =
     previousLifecycleState &&
     previousLifecycleState.lifecycle === args.payload.lifecycle &&
-    previousLifecycleState.lifecycleDetectedAt
+    previousLifecycleState.lifecycleDetectedAt &&
+    args.payload.lifecycle === "awarded"
       ? {
           lifecycleDetectedAt: previousLifecycleState.lifecycleDetectedAt,
           lifecycleDateSource: previousLifecycleState.lifecycleDateSource,
@@ -859,6 +1029,40 @@ async function updateTenderScrapedFields(args: {
   `)
 }
 
+async function persistTenderExternalDocuments(args: {
+  tenderId: string
+  orgId?: string | null
+  documents: PersistedExternalTenderDocument[]
+}) {
+  const documentsJson = JSON.stringify(args.documents)
+
+  try {
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "Tender"
+      SET
+        "documents" = ${documentsJson}::jsonb,
+        "updatedAt" = NOW()
+      WHERE "id" = ${args.tenderId}
+    `)
+    return
+  } catch (error) {
+    if (!isMissingTenderScrapedColumnsError(error)) throw error
+  }
+
+  const table = await getLegacyScrapedTableName()
+  if (!table || !args.orgId) return
+
+  const tableRef = Prisma.raw(`"${table}"`)
+  await prisma.$executeRaw(Prisma.sql`
+    UPDATE ${tableRef}
+    SET
+      "documents" = ${documentsJson}::jsonb,
+      "updatedAt" = NOW()
+    WHERE "tenderId" = ${args.tenderId}
+      AND "orgId" = ${args.orgId}
+  `)
+}
+
 type TenderSortField = "title" | "status" | "closingDate" | "companyName"
 type TenderSortDirection = "asc" | "desc"
 type TenderLifecycleFilter = TenderLifecycle | "all"
@@ -922,6 +1126,7 @@ function orderBySql(
 }
 
 export async function listTenders(args: {
+  orgId: string
   page: number
   pageSize: number
   search?: string
@@ -952,6 +1157,12 @@ export async function listTenders(args: {
   const applyVisibilityFilters =
     !includeHistorical && hideClosedTenders && lifecycle === "open"
   const applyRetentionFilter = !includeHistorical && retentionCutoff !== null
+  const orgScopeFilter = Prisma.sql`
+    AND (
+      t."orgId" = ${args.orgId}
+      OR t."orgId" IS NULL
+    )
+  `
 
   let rows: ListTenderRow[]
   let totals: Array<{ total: number }>
@@ -965,6 +1176,19 @@ export async function listTenders(args: {
     END,
     d."closingAt"
   )`
+  const resolvedLifecycleExpr =
+    lifecycle === "awarded"
+      ? `COALESCE(t."lifecycleDetectedAt", ${resolvedClosingExpr})`
+      : lifecycle === "cancelled"
+        ? `COALESCE(
+            CASE
+              WHEN LOWER(COALESCE(t."lifecycleDateSource", '')) = 'cancelled_date'
+                THEN t."lifecycleDetectedAt"
+              ELSE NULL
+            END,
+            ${resolvedClosingExpr}
+          )`
+        : resolvedClosingExpr
 
   try {
     const activeStatusFilter = !applyVisibilityFilters
@@ -1028,7 +1252,7 @@ export async function listTenders(args: {
       sortField,
       sortDirection,
       `t."companyName"`,
-      resolvedClosingExpr,
+      resolvedLifecycleExpr,
     )
 
     ;[rows, totals] = await prisma.$transaction([
@@ -1044,12 +1268,16 @@ export async function listTenders(args: {
           t."updatedAt",
           d."closingAt" AS "deadlineClosingAt",
           t."closingDate" AS "tenderClosingDate",
+          t."lifecycle",
+          t."lifecycleDetectedAt",
+          t."lifecycleDateSource",
           t."companyName",
           t."scrapedStatus",
           t."amount"
         FROM "Tender" t
         LEFT JOIN "TenderDeadline" d ON d."tenderId" = t."id"
         WHERE t."source" IS DISTINCT FROM ${ORG_PROFILE_TENDER_SOURCE}
+        ${orgScopeFilter}
         ${lifecycleFilter}
         ${activeStatusFilter}
         ${closedFilter}
@@ -1064,6 +1292,7 @@ export async function listTenders(args: {
         FROM "Tender" t
         LEFT JOIN "TenderDeadline" d ON d."tenderId" = t."id"
         WHERE t."source" IS DISTINCT FROM ${ORG_PROFILE_TENDER_SOURCE}
+        ${orgScopeFilter}
         ${lifecycleFilter}
         ${activeStatusFilter}
         ${closedFilter}
@@ -1108,6 +1337,11 @@ export async function listTenders(args: {
       const closingSelect = table
         ? Prisma.sql`s."closingDate" AS "tenderClosingDate"`
         : Prisma.sql`NULL::text AS "tenderClosingDate"`
+      const lifecycleSelect = Prisma.sql`NULL::text AS "lifecycle"`
+      const lifecycleDetectedAtSelect =
+        Prisma.sql`NULL::timestamp AS "lifecycleDetectedAt"`
+      const lifecycleDateSourceSelect =
+        Prisma.sql`NULL::text AS "lifecycleDateSource"`
       const maybeJoin = table
         ? Prisma.sql`LEFT JOIN ${tableRef!} s ON s."tenderId" = t."id"`
         : Prisma.empty
@@ -1167,6 +1401,9 @@ export async function listTenders(args: {
             t."updatedAt",
             d."closingAt" AS "deadlineClosingAt",
             ${closingSelect},
+            ${lifecycleSelect},
+            ${lifecycleDetectedAtSelect},
+            ${lifecycleDateSourceSelect},
             ${companySelect},
             ${scrapedStatusSelect},
             NULL::text AS "amount"
@@ -1174,6 +1411,7 @@ export async function listTenders(args: {
           LEFT JOIN "TenderDeadline" d ON d."tenderId" = t."id"
           ${maybeJoin}
           WHERE t."source" IS DISTINCT FROM ${ORG_PROFILE_TENDER_SOURCE}
+          ${orgScopeFilter}
           ${lifecycleFilter}
           ${activeStatusFilter}
           ${closedFilter}
@@ -1188,6 +1426,7 @@ export async function listTenders(args: {
           FROM "Tender" t
           LEFT JOIN "TenderDeadline" d ON d."tenderId" = t."id"
           WHERE t."source" IS DISTINCT FROM ${ORG_PROFILE_TENDER_SOURCE}
+          ${orgScopeFilter}
           ${lifecycleFilter}
           ${activeStatusFilter}
           ${closedFilter}
@@ -1276,6 +1515,7 @@ export async function listTenders(args: {
           FROM "Tender" t
           LEFT JOIN "TenderDeadline" d ON d."tenderId" = t."id"
           WHERE t."source" IS DISTINCT FROM ${ORG_PROFILE_TENDER_SOURCE}
+          ${orgScopeFilter}
           ${lifecycleFilter}
           ${activeStatusFilter}
           ${closedFilter}
@@ -1290,6 +1530,7 @@ export async function listTenders(args: {
           FROM "Tender" t
           LEFT JOIN "TenderDeadline" d ON d."tenderId" = t."id"
           WHERE t."source" IS DISTINCT FROM ${ORG_PROFILE_TENDER_SOURCE}
+          ${orgScopeFilter}
           ${lifecycleFilter}
           ${activeStatusFilter}
           ${closedFilter}
@@ -1301,25 +1542,48 @@ export async function listTenders(args: {
   }
 
   const total = totals[0]?.total ?? 0
-  const items = rows.map((row) => ({
-    id: row.id,
-    orgId: row.orgId,
-    title: row.title,
-    source: row.source,
-    status: row.status,
-    createdByUserId: row.createdByUserId,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    closingDate:
-      row.deadlineClosingAt?.toISOString() ?? row.tenderClosingDate ?? null,
-    companyName: row.companyName?.trim() || null,
-    amount: row.amount?.trim() || null,
-    lifecycle: inferTenderLifecycle({
+  const items = rows.map((row) => {
+    const tenderClosingDate = row.tenderClosingDate ?? null
+    const inferredLifecycle = inferTenderLifecycle({
       scrapedStatus: row.scrapedStatus,
-      closingDate:
-        row.deadlineClosingAt?.toISOString() ?? row.tenderClosingDate ?? null,
-    }),
-  }))
+      closingDate: tenderClosingDate,
+    })
+    const lifecycle =
+      row.lifecycle === "awarded" ||
+      row.lifecycle === "closed" ||
+      row.lifecycle === "cancelled" ||
+      row.lifecycle === "open"
+        ? row.lifecycle
+        : inferredLifecycle
+    const lifecycleDateInfo = inferLifecycleDateInfo({
+      lifecycle,
+      closingDate: tenderClosingDate,
+      lifecycleDetectedAt: row.lifecycleDetectedAt,
+      lifecycleDateSource: row.lifecycleDateSource,
+    })
+    const displayDate =
+      lifecycle === "open"
+        ? row.deadlineClosingAt?.toISOString() ?? tenderClosingDate
+        : toIsoStringOrNull(lifecycleDateInfo.date) ??
+          tenderClosingDate ??
+          row.deadlineClosingAt?.toISOString() ??
+          null
+
+    return {
+      id: row.id,
+      orgId: row.orgId,
+      title: row.title,
+      source: row.source,
+      status: row.status,
+      createdByUserId: row.createdByUserId,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      closingDate: displayDate,
+      companyName: row.companyName?.trim() || null,
+      amount: row.amount?.trim() || null,
+      lifecycle,
+    }
+  })
 
   return { items, total }
 }
@@ -1419,28 +1683,69 @@ async function fetchETendersPage(args: {
   url.searchParams.set("status", String(args.status))
   url.searchParams.set("_", String(Date.now()))
 
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      Accept: "application/json, text/javascript, */*; q=0.01",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-  })
+  let lastError: unknown = null
 
-  if (!res.ok) {
-    throw new AppError(
-      "ETENDERS_FETCH_FAILED",
-      `Failed to fetch eTenders feed (${res.status})`,
-      502,
-    )
+  for (let attempt = 1; attempt <= ETENDERS_FEED_FETCH_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          Accept: "application/json, text/javascript, */*; q=0.01",
+          "X-Requested-With": "XMLHttpRequest",
+          "User-Agent": ETENDERS_FEED_USER_AGENT,
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        signal: AbortSignal.timeout(ETENDERS_FEED_FETCH_TIMEOUT_MS),
+      })
+
+      if (!res.ok) {
+        const shouldRetryStatus =
+          res.status >= 500 || res.status === 429 || res.status === 408
+        if (shouldRetryStatus && attempt < ETENDERS_FEED_FETCH_ATTEMPTS) {
+          await delay(ETENDERS_FEED_RETRY_BASE_DELAY_MS * attempt)
+          continue
+        }
+
+        throw new AppError(
+          "ETENDERS_FETCH_FAILED",
+          `Failed to fetch eTenders feed (${res.status})`,
+          502,
+        )
+      }
+
+      const payload = (await res.json()) as ETendersPayload
+      return {
+        rows: payload.data ?? [],
+        recordsTotal: payload.recordsTotal ?? 0,
+        recordsFiltered: payload.recordsFiltered ?? 0,
+      }
+    } catch (error) {
+      lastError = error
+      const shouldRetry =
+        !(error instanceof AppError) &&
+        isRetriableETendersFetchError(error) &&
+        attempt < ETENDERS_FEED_FETCH_ATTEMPTS
+
+      if (shouldRetry) {
+        await delay(ETENDERS_FEED_RETRY_BASE_DELAY_MS * attempt)
+        continue
+      }
+
+      if (error instanceof AppError) throw error
+
+      throw new AppError(
+        "ETENDERS_FETCH_FAILED",
+        `Failed to fetch eTenders feed: ${getErrorMessage(error)}`,
+        502,
+      )
+    }
   }
 
-  const payload = (await res.json()) as ETendersPayload
-  return {
-    rows: payload.data ?? [],
-    recordsTotal: payload.recordsTotal ?? 0,
-    recordsFiltered: payload.recordsFiltered ?? 0,
-  }
+  throw new AppError(
+    "ETENDERS_FETCH_FAILED",
+    `Failed to fetch eTenders feed after ${ETENDERS_FEED_FETCH_ATTEMPTS} attempts: ${getErrorMessage(lastError)}`,
+    502,
+  )
 }
 
 function parseETenderIdFromSource(source: string | null) {
@@ -1497,7 +1802,21 @@ function mapRowToExternalDocuments(
         doc.fileName,
         doc.extension,
       ),
+      archivedStorageKey: null,
+      archivedMimeType: null,
+      archivedSizeBytes: null,
+      archivedChecksumSha256: null,
+      archivedAt: null,
     }))
+}
+
+async function fetchETenderDetailsDocuments(
+  row: ETenderRow,
+): Promise<PersistedExternalTenderDocument[]> {
+  const scrapedDocs = await fetchETenderDetailsDocumentsById(row.id)
+  if (scrapedDocs.length > 0) return scrapedDocs
+
+  return mapRowToExternalDocuments(row)
 }
 
 function normalizeFeedStatus(status: number, rawStatus: string | null) {
@@ -1527,6 +1846,10 @@ function extractTenderClosingDate(row: ETenderRow) {
   const closing = (row.closing_Date ?? "").trim()
   if (closing) return closing
 
+  return null
+}
+
+function extractTenderCancelledDate(row: ETenderRow) {
   const cancelled = (row.cancelled_Date ?? row.canceled_Date ?? "").trim()
   if (cancelled) return cancelled
 
@@ -1555,10 +1878,12 @@ function mapRowToScrapedPayload(
 ) {
   const scrapedStatus = normalizeFeedStatus(feedStatus, row.status)
   const closingDate = extractTenderClosingDate(row)
+  const cancelledDate = extractTenderCancelledDate(row)
   const lifecycle = inferTenderLifecycle({
     scrapedStatus,
-    closingDate,
+    closingDate: closingDate ?? cancelledDate,
   })
+  const lifecycleDateSource = inferLifecycleDateSourceFromRow(row, lifecycle)
   return {
     source: "etenders.gov.za",
     externalId: row.id,
@@ -1573,15 +1898,22 @@ function mapRowToScrapedPayload(
     closingDate,
     amount: extractTenderAmount(row),
     lifecycle,
-    lifecycleDateSource: inferLifecycleDateSourceFromRow(row, lifecycle),
-    lifecycleDetectedAt: new Date(),
+    lifecycleDateSource,
+    lifecycleDetectedAt:
+      lifecycle === "awarded"
+        ? new Date()
+        : lifecycleDateSource === "cancelled_date"
+          ? parseDateLike(cancelledDate)
+          : lifecycleDateSource === "closing_date"
+            ? parseDateLike(closingDate)
+            : null,
     documents: docs,
   }
 }
 
-function parsePersistedExternalDocuments(
+function parsePersistedExternalDocumentRecords(
   value: unknown,
-): ExternalTenderDocument[] {
+): PersistedExternalTenderDocument[] {
   if (!Array.isArray(value)) return []
 
   return value
@@ -1597,15 +1929,254 @@ function parsePersistedExternalDocuments(
       }
       return {
         id: doc.id,
-        name: normalizeExternalDocumentName({
-          id: doc.id,
-          name: doc.name,
-          path: doc.path,
-        }),
+        name: doc.name,
         path: doc.path,
-      }
+        archivedStorageKey:
+          typeof doc.archivedStorageKey === "string"
+            ? doc.archivedStorageKey
+            : null,
+        archivedMimeType:
+          typeof doc.archivedMimeType === "string" ? doc.archivedMimeType : null,
+        archivedSizeBytes:
+          typeof doc.archivedSizeBytes === "number" ? doc.archivedSizeBytes : null,
+        archivedChecksumSha256:
+          typeof doc.archivedChecksumSha256 === "string"
+            ? doc.archivedChecksumSha256
+            : null,
+        archivedAt:
+          typeof doc.archivedAt === "string" ? doc.archivedAt : null,
+      } satisfies PersistedExternalTenderDocument
     })
-    .filter((item): item is ExternalTenderDocument => item !== null)
+    .filter((item): item is PersistedExternalTenderDocument => item !== null)
+}
+
+export function mergePersistedExternalDocuments(
+  existing: PersistedExternalTenderDocument[],
+  incoming: PersistedExternalTenderDocument[],
+) {
+  if (incoming.length === 0) return existing.map((doc) => ({ ...doc }))
+
+  const byId = new Map(existing.map((doc) => [doc.id, doc]))
+  const merged: PersistedExternalTenderDocument[] = []
+  const seenIds = new Set<string>()
+
+  for (const doc of incoming) {
+    const previous = byId.get(doc.id)
+    merged.push({
+      ...previous,
+      ...doc,
+      archivedStorageKey: doc.archivedStorageKey ?? previous?.archivedStorageKey ?? null,
+      archivedMimeType: doc.archivedMimeType ?? previous?.archivedMimeType ?? null,
+      archivedSizeBytes: doc.archivedSizeBytes ?? previous?.archivedSizeBytes ?? null,
+      archivedChecksumSha256:
+        doc.archivedChecksumSha256 ?? previous?.archivedChecksumSha256 ?? null,
+      archivedAt: doc.archivedAt ?? previous?.archivedAt ?? null,
+    })
+    seenIds.add(doc.id)
+  }
+
+  for (const doc of existing) {
+    if (seenIds.has(doc.id)) continue
+    merged.push({ ...doc })
+  }
+
+  return merged
+}
+
+async function archiveExternalTenderDocument(args: {
+  tenderId: string
+  document: PersistedExternalTenderDocument
+}) {
+  if (args.document.archivedStorageKey) return args.document
+
+  const controller = new AbortController()
+  const timeout = setTimeout(
+    () => controller.abort(),
+    EXTERNAL_TENDER_ARCHIVE_FETCH_TIMEOUT_MS,
+  )
+
+  try {
+    const response = await fetch(args.document.path, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": ETENDERS_FEED_USER_AGENT,
+        Accept: "*/*",
+      },
+    })
+    if (!response.ok) return args.document
+
+    const mimeType = pickExternalDocumentMimeType(
+      response.headers.get("content-type"),
+      args.document.name,
+    )
+    if (!mimeType || !EXTERNAL_TENDER_ARCHIVABLE_MIME_TYPES.has(mimeType)) {
+      return args.document
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const buf = Buffer.from(arrayBuffer)
+    if (!buf.length || buf.length > EXTERNAL_TENDER_ARCHIVE_MAX_BYTES) {
+      return args.document
+    }
+    if (looksLikeHtmlDocument(buf)) return args.document
+
+    const safeName =
+      normalizeExternalDocumentName(args.document)
+        .replace(/[^a-zA-Z0-9._-]/g, "_")
+        .trim() || `external-${args.document.id}`
+    const key = `tenders/external-documents/${args.tenderId}/${crypto.randomUUID()}-${safeName}`
+    const checksum = sha256(buf)
+    const stored = await storage().putObject({
+      key,
+      body: buf,
+      mimeType,
+    })
+
+    return {
+      ...args.document,
+      archivedStorageKey: stored.key,
+      archivedMimeType: stored.mimeType,
+      archivedSizeBytes: stored.sizeBytes,
+      archivedChecksumSha256: stored.checksumSha256 || checksum,
+      archivedAt: new Date().toISOString(),
+    } satisfies PersistedExternalTenderDocument
+  } catch {
+    return args.document
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function archiveExternalTenderDocuments(args: {
+  tenderId: string
+  documents: PersistedExternalTenderDocument[]
+}) {
+  const archived: PersistedExternalTenderDocument[] = []
+  let changed = false
+
+  for (const doc of args.documents) {
+    const next = await archiveExternalTenderDocument({
+      tenderId: args.tenderId,
+      document: doc,
+    })
+    if (next.archivedStorageKey && next.archivedStorageKey !== doc.archivedStorageKey) {
+      changed = true
+    }
+    archived.push(next)
+  }
+
+  return { documents: archived, changed }
+}
+
+async function fetchETenderDetailsDocumentsById(
+  externalId: number,
+): Promise<PersistedExternalTenderDocument[]> {
+  try {
+    const detailsUrl = `https://www.etenders.gov.za/Home/TenderOpportunitiesDetails?id=${externalId}`
+    const res = await fetch(detailsUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": ETENDERS_FEED_USER_AGENT,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    })
+
+    if (!res.ok) return []
+
+    const html = await res.text()
+    const regex = /href=['"]([^'"]*home\/Download\/\?blobName=[^'"]+)['"]/gi
+    let match
+    const scrapedDocs: PersistedExternalTenderDocument[] = []
+    const seenIds = new Set<string>()
+
+    while ((match = regex.exec(html)) !== null) {
+      let urlStr = match[1]
+      urlStr = urlStr.replace(/&amp;/g, "&")
+
+      if (!urlStr.startsWith("http")) {
+        urlStr = `https://www.etenders.gov.za${urlStr.startsWith("/") ? "" : "/"}${urlStr}`
+      }
+
+      try {
+        const parsedUrl = new URL(urlStr)
+        const blobName = parsedUrl.searchParams.get("blobName") || ""
+        const downloadedFileName =
+          parsedUrl.searchParams.get("downloadedFileName") || ""
+
+        const idMatch =
+          /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(
+            blobName,
+          )
+        const docId = idMatch ? idMatch[1] : blobName
+        const fileName = downloadedFileName || blobName
+
+          if (docId && !seenIds.has(docId)) {
+            seenIds.add(docId)
+            scrapedDocs.push({
+              id: docId,
+              name: fileName,
+              path: urlStr,
+              archivedStorageKey: null,
+              archivedMimeType: null,
+              archivedSizeBytes: null,
+              archivedChecksumSha256: null,
+              archivedAt: null,
+            })
+          }
+      } catch {
+        // ignore parsing error for this link
+      }
+    }
+
+    return scrapedDocs
+  } catch {
+    return []
+  }
+}
+
+async function recoverTenderExternalDocuments(args: {
+  tenderId: string
+  orgId?: string | null
+  source: string | null
+  externalId: number | null
+  documents: PersistedExternalTenderDocument[]
+}) {
+  if (args.documents.length > 0) return args.documents
+
+  const externalId = args.externalId ?? parseETenderIdFromSource(args.source)
+  if (!externalId) return args.documents
+
+  const recovered = await fetchETenderDetailsDocumentsById(externalId)
+  if (recovered.length === 0) return args.documents
+
+  const merged = mergePersistedExternalDocuments(args.documents, recovered)
+  await persistTenderExternalDocuments({
+    tenderId: args.tenderId,
+    orgId: args.orgId,
+    documents: merged,
+  })
+  return merged
+}
+
+function mapPersistedExternalDocumentsToClient(
+  tenderId: string,
+  documents: PersistedExternalTenderDocument[],
+): ExternalTenderDocument[] {
+  return documents.map((doc) => ({
+    id: doc.id,
+    name: normalizeExternalDocumentName({
+      id: doc.id,
+      name: doc.name,
+      path: doc.path,
+    }),
+    path: doc.archivedStorageKey
+      ? buildArchivedExternalDocumentDownloadPath({
+          tenderId,
+          documentId: doc.id,
+        })
+      : doc.path,
+  }))
 }
 
 export async function getScrapedTenderDataForTender(args: {
@@ -1653,11 +2224,66 @@ export async function getExternalDocumentsForTender(args: {
     }
   }
 
-  const items = parsePersistedExternalDocuments(stored.documents)
+  let documents = parsePersistedExternalDocumentRecords(stored.documents)
+  documents = await recoverTenderExternalDocuments({
+    tenderId: tender.id,
+    orgId: args.orgId,
+    source: stored.source ?? tender.source,
+    externalId: stored.externalId ?? parseETenderIdFromSource(tender.source),
+    documents,
+  })
+
+  const lifecycle = inferTenderLifecycle({
+    scrapedStatus: stored.scrapedStatus,
+    closingDate: stored.closingDate,
+  })
+
+  if (lifecycle !== "open" && documents.some((doc) => !doc.archivedStorageKey)) {
+    const archived = await archiveExternalTenderDocuments({
+      tenderId: tender.id,
+      documents,
+    })
+    if (archived.changed) {
+      documents = archived.documents
+      await persistTenderExternalDocuments({
+        tenderId: tender.id,
+        orgId: args.orgId,
+        documents,
+      })
+    }
+  }
+
+  const items = mapPersistedExternalDocumentsToClient(tender.id, documents)
 
   return {
     source: inferScrapedSource(stored.source),
     items,
+  }
+}
+
+export async function downloadExternalDocumentForTender(args: {
+  orgId?: string | null
+  tenderId: string
+  documentId: string
+}) {
+  const tender = await getTender({ orgId: args.orgId, tenderId: args.tenderId })
+  const stored = await loadTenderScrapedSnapshot(tender.id)
+  const documents = parsePersistedExternalDocumentRecords(stored?.documents)
+  const doc = documents.find((item) => item.id === args.documentId)
+
+  if (!doc || !doc.archivedStorageKey) {
+    throw new AppError("NOT_FOUND", "Archived external document not found", 404)
+  }
+
+  const content = await storage().getObject({ key: doc.archivedStorageKey })
+  return {
+    content,
+    mimeType: doc.archivedMimeType || mimeFromFilename(doc.name) || "application/octet-stream",
+    filename: deriveDisplayFilename({
+      originalFilename: doc.name,
+      storageKey: doc.archivedStorageKey,
+      mimeType: doc.archivedMimeType,
+    }),
   }
 }
 
@@ -1931,8 +2557,12 @@ export async function importETenders(args: {
     (isEverything || totalImported + totalSkipped < targetLimit) &&
     !stopTriggered
   ) {
+    const maxBatchSize =
+      args.status === 4
+        ? ETENDERS_IMPORT_CANCELLED_BATCH_SIZE
+        : ETENDERS_IMPORT_BATCH_SIZE
     const batchSize = Math.min(
-      250,
+      maxBatchSize,
       isEverything ? 250 : targetLimit - (totalImported + totalSkipped),
     )
     if (batchSize <= 0) break
@@ -1985,35 +2615,32 @@ export async function importETenders(args: {
       const source = entry.source
       const existingTenderId = existingBySource.get(source)
       if (existingTenderId) {
-        if (args.status !== 1) {
-          const previousLifecycleState = await loadTenderLifecycleState(
-            existingTenderId,
-          )
-          const docs = mapRowToExternalDocuments(row)
-          const scrapedPayload = mapRowToScrapedPayload(row, docs, args.status)
-          await updateTenderScrapedFields({
-            tenderId: existingTenderId,
-            orgId: args.orgId,
-            payload: scrapedPayload,
-          })
-          await maybeLogLifecycleChange({
-            orgId: args.orgId,
-            tenderId: existingTenderId,
-            previous: {
-              lifecycle: previousLifecycleState.lifecycle,
-              lifecycleDetectedAt: previousLifecycleState.lifecycleDetectedAt,
-              lifecycleDateSource: previousLifecycleState.lifecycleDateSource,
-            },
-            next: scrapedPayload,
-          })
-        }
+        const previousLifecycleState = await loadTenderLifecycleState(
+          existingTenderId,
+        )
+        const docs = await fetchETenderDetailsDocuments(row)
+        const scrapedPayload = mapRowToScrapedPayload(row, docs, args.status)
+        
+        await updateTenderScrapedFields({
+          tenderId: existingTenderId,
+          orgId: args.orgId,
+          payload: scrapedPayload,
+        })
+        
+        await maybeLogLifecycleChange({
+          orgId: args.orgId,
+          tenderId: existingTenderId,
+          previous: {
+            lifecycle: previousLifecycleState.lifecycle,
+            lifecycleDetectedAt: previousLifecycleState.lifecycleDetectedAt,
+            lifecycleDateSource: previousLifecycleState.lifecycleDateSource,
+          },
+          next: scrapedPayload,
+        })
 
         skippedItems.push({
           source,
-          reason:
-            args.status === 1
-              ? "ALREADY_IMPORTED"
-              : "UPDATED_EXISTING_STATUS",
+          reason: "UPDATED_EXISTING_STATUS",
           tenderNo: row.tender_No,
           title,
         })
@@ -2026,7 +2653,7 @@ export async function importETenders(args: {
         continue
       }
 
-      const docs = mapRowToExternalDocuments(row)
+      const docs = await fetchETenderDetailsDocuments(row)
       const scrapedPayload = mapRowToScrapedPayload(row, docs, args.status)
 
       const tender = supportsInlineScrapedColumns

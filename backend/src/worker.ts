@@ -1,6 +1,11 @@
 import express from "express"
 import { Worker } from "bullmq"
 import { env } from "./config/env"
+import {
+  captureBackgroundException,
+  initSentry,
+  registerSentryProcessHandlers,
+} from "./monitoring/sentry"
 import { prisma } from "./db/prisma"
 import { storage } from "./modules/storage/storage"
 import type { ExtractJobPayload } from "./modules/queue/jobs"
@@ -18,6 +23,9 @@ import { NotificationType } from "@prisma/client"
 
 import { startDeliveryWorker } from "./workers/delivery.worker"
 import { logTenderChange } from "./modules/tenders/changeLog.service"
+
+initSentry("worker")
+registerSentryProcessHandlers("worker")
 
 async function extractTextPrimary(mimeType: string, buf: Buffer) {
   if (mimeType === "application/pdf") {
@@ -342,6 +350,18 @@ worker.on("failed", async (job, err) => {
   try {
     if (!job) return
     const { processingJobId, tenderId } = job.data as ExtractJobPayload
+
+    captureBackgroundException(err, {
+      service: "worker",
+      area: "queue",
+      mechanism: "worker.failed",
+      queue: "tender-extract",
+      jobId: String(job.id ?? ""),
+      orgId: job.data.orgId,
+      tenderId,
+      tenderFileId: job.data.tenderFileId,
+      processingJobId,
+    })
 
     await prisma.processingJob.update({
       where: { id: processingJobId },

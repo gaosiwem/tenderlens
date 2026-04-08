@@ -1,23 +1,75 @@
+import { apiUploadFile, baseUrl, ensureAccessToken } from "@/lib/api";
+
 export async function uploadWorkspaceAttachment(
   workspaceId: string,
   file: File,
   taskId?: string,
 ) {
-  const form = new FormData();
-  form.append("file", file);
-  if (taskId) form.append("taskId", taskId);
+  return apiUploadFile<{ attachment: unknown }>(
+    `/api/v1/attachments/workspaces/${workspaceId}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ""}`,
+    file,
+  );
+}
 
-  const res = await fetch(`/api/v1/attachments/workspaces/${workspaceId}`, {
-    method: "POST",
-    body: form,
-    credentials: "include",
-  });
+function filenameFromDisposition(
+  contentDisposition: string | null,
+  fallbackName: string,
+) {
+  if (!contentDisposition) return fallbackName;
 
-  const json = await res.json().catch(() => null);
-  if (!res.ok)
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return fallbackName;
+    }
+  }
+
+  const asciiMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+  return asciiMatch?.[1] ?? fallbackName;
+}
+
+export async function downloadWorkspaceAttachment(
+  attachmentId: string,
+  fallbackName: string,
+) {
+  const { token } = await ensureAccessToken();
+  const headers = new Headers();
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const res = await fetch(
+    `${baseUrl}/api/v1/attachments/${attachmentId}/download`,
+    {
+      method: "GET",
+      headers,
+      credentials: "include",
+    },
+  );
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => null);
     return {
       ok: false as const,
-      error: { message: json?.error?.message ?? "Upload failed" },
+      error: { message: json?.error?.message ?? "Download failed" },
     };
-  return { ok: true as const, data: json?.data ?? json };
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filenameFromDisposition(
+    res.headers.get("content-disposition"),
+    fallbackName,
+  );
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+
+  return { ok: true as const };
 }

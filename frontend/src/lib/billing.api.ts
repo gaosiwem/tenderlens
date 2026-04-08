@@ -21,24 +21,26 @@ export async function getUsage() {
 }
 
 /**
- * Start a Stripe checkout session for a specific subscription plan.
+ * Start a PayFast checkout session for a specific subscription plan.
  */
 export async function startPlanCheckout(
   plan: "PRO" | "BUSINESS",
   quantity: number = 1,
   promoCode?: string,
 ) {
-  return apiFetch<{ checkoutUrl: string }>("/api/v1/billing/plan-checkout", {
+  return apiFetch<{
+    gateway: "PAYFAST" | "PAYFAST_SANDBOX_LOCAL";
+    paymentUrl: string;
+    fields: Record<string, string>;
+    reference: string;
+  }>("/api/v1/billing/plan-checkout", {
     method: "POST",
     body: JSON.stringify({ plan, quantity, promoCode }),
   });
 }
 
-/**
- * Open the Stripe Customer Portal for managing subscriptions.
- */
-export async function openPortal() {
-  return apiFetch<{ portalUrl: string }>("/api/v1/billing/portal", {
+export async function completeSandboxCheckout() {
+  return apiFetch<{ completed: true }>("/api/v1/billing/payfast/dev-complete-latest", {
     method: "POST",
   });
 }

@@ -61,7 +61,6 @@ export async function planRemindersForWatchlist(args: {
 
   const d = tender.deadlines
   const types: { type: any; date: Date | null }[] = [
-    { type: "BRIEFING_SESSION", date: d.briefingAt },
     { type: "SITE_VISIT", date: d.siteVisitAt },
   ]
 

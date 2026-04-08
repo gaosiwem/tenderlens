@@ -2,10 +2,11 @@ import { Worker } from "bullmq"
 import { redis } from "../redis/client"
 import { prisma } from "../db/prisma"
 import { sendEmail } from "../modules/notifications/email.sender"
-import { sendWhatsApp } from "../modules/notifications/whatsapp.sender"
+import { sendSms } from "../modules/notifications/sms.sender"
 import { buildNotificationContent } from "../modules/notifications/message.builder"
 import { env } from "../config/env"
 import { deliveryQueue } from "../queues/delivery.queue"
+import { captureBackgroundException } from "../monitoring/sentry"
 
 async function processOne(id: string) {
   const item = await prisma.notificationDelivery.findFirst({ where: { id } })
@@ -32,8 +33,8 @@ async function processOne(id: string) {
   try {
     if (item.channel === "email") {
       await sendEmail(item.to, subject, text, html)
-    } else if (item.channel === "whatsapp") {
-      await sendWhatsApp(item.to, text)
+    } else if (item.channel === "whatsapp" || item.channel === "sms") {
+      await sendSms(item.to, text)
     }
 
     await prisma.notificationDelivery.update({
@@ -64,6 +65,13 @@ export function startDeliveryWorker() {
   )
 
   worker.on("failed", (job, err) => {
+    captureBackgroundException(err, {
+      service: "worker",
+      area: "queue",
+      mechanism: "delivery.failed",
+      queue: "notificationDelivery",
+      jobId: job?.id ? String(job.id) : null,
+    })
     console.error(`Delivery job ${job?.id} failed: ${err.message}`)
   })
 }

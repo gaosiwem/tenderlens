@@ -42,7 +42,7 @@ export async function getTemplateById(
 }
 
 function toTemplateRuleName(template: WatchlistTemplate) {
-  return `Template: ${template.name}`
+  return `Category: ${template.name}`
 }
 
 export async function selectTemplateForTender(input: string) {
@@ -71,7 +71,7 @@ export async function ensureTemplateAlertRule(args: {
 }) {
   const template = await getTemplateById(args.templateId)
   if (!template) {
-    throw new AppError("VALIDATION_ERROR", "Template not found", 400)
+    throw new AppError("VALIDATION_ERROR", "Category not found", 400)
   }
 
   const existing = await prisma.alertRule.findFirst({
@@ -168,9 +168,7 @@ export async function applyTemplate(args: {
           userId: args.userId,
           tenderId: tender.id,
           templateId: args.templateId,
-          reminderTypes: buildDefaultWatchlistReminderTypes({
-            hasBriefingSession: Boolean(tender.deadlines?.briefingAt),
-          }),
+          reminderTypes: buildDefaultWatchlistReminderTypes(),
         },
       })
       addedCount++

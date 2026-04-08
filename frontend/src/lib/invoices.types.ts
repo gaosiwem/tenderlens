@@ -1,5 +1,5 @@
 export type OrgInvoice = {
-  stripeInvoiceId: string;
+  id: string;
   status: string | null;
   amountDue: number | null;
   amountPaid: number | null;

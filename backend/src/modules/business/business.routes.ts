@@ -292,7 +292,7 @@ businessRouter.patch(
       const existing = await prisma.workspaceTemplate.findFirst({
         where: { id, orgId: req.orgId!, isArchived: false },
       })
-      if (!existing) throw new AppError("NOT_FOUND", "Template not found", 404)
+      if (!existing) throw new AppError("NOT_FOUND", "Category not found", 404)
 
       const tasksProvided = body.tasks !== undefined
       const tasks = tasksProvided
@@ -363,7 +363,7 @@ businessRouter.delete(
       const existing = await prisma.workspaceTemplate.findFirst({
         where: { id, orgId: req.orgId!, isArchived: false },
       })
-      if (!existing) throw new AppError("NOT_FOUND", "Template not found", 404)
+      if (!existing) throw new AppError("NOT_FOUND", "Category not found", 404)
       await prisma.workspaceTemplate.update({
         where: { id: existing.id },
         data: { isArchived: true, isDefault: false },
@@ -388,7 +388,7 @@ businessRouter.post(
           tasks: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
         },
       })
-      if (!template) throw new AppError("NOT_FOUND", "Template not found", 404)
+      if (!template) throw new AppError("NOT_FOUND", "Category not found", 404)
 
       const workspace = await getOrCreateWorkspace({
         orgId: req.orgId!,

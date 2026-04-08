@@ -19,6 +19,7 @@ import {
   getTenderExtract,
   createProcessingJob,
   getExternalDocumentsForTender,
+  downloadExternalDocumentForTender,
   getScrapedTenderDataForTender,
   importETenders,
   type ImportETendersProgress,
@@ -27,10 +28,10 @@ import {
   getTenderOutcomeInsights,
 } from "./tender.service"
 import { storage } from "../storage/storage"
-import { extractionQueue } from "../queue/queue"
+import { enqueueExtractionJob } from "../queue/queue"
 import type { ExtractJobPayload } from "../queue/jobs"
 import crypto from "crypto"
-import path from "path"
+import { validateUploadedFile } from "../../utils/uploadValidation"
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -84,6 +85,7 @@ tenderRouter.get("/", requireAuth, requireOrgMembership, async (req, res, next) 
     const lifecycle = String(req.query.lifecycle ?? "open")
     await requireTenderLifecycleAccess(req.orgId!, lifecycle)
     const out = await listTenders({
+      orgId: req.orgId!,
       page,
       pageSize,
       search,
@@ -178,6 +180,37 @@ tenderRouter.get(
         tenderId: req.params.tenderId,
       })
       res.json(ok(out))
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+tenderRouter.get(
+  "/:tenderId/external-documents/:documentId/download",
+  requireAuth,
+  requireOrgMembership,
+  async (req, res, next) => {
+    try {
+      await enforceLifecycleAccessForTender({
+        orgId: req.orgId,
+        tenderId: req.params.tenderId,
+      })
+      const file = await downloadExternalDocumentForTender({
+        orgId: req.orgId,
+        tenderId: req.params.tenderId,
+        documentId: req.params.documentId,
+      })
+      const encodedName = encodeURIComponent(file.filename)
+      const asciiName = file.filename.replace(/[^\x20-\x7E]/g, "_")
+
+      res.setHeader("Content-Type", file.mimeType)
+      res.setHeader("Content-Length", String(file.content.length))
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
+      )
+      res.send(file.content)
     } catch (e) {
       next(e)
     }
@@ -321,22 +354,21 @@ tenderRouter.post(
 
       const file = (req as any).file
       if (!file) throw new AppError("VALIDATION_ERROR", "Missing file", 400)
-      if (!allowedMime.has(file.mimetype))
-        throw new AppError("VALIDATION_ERROR", "Unsupported file type", 400)
+      const validated = validateUploadedFile({
+        file,
+        allowedMimeTypes: allowedMime,
+        fileLabel: "Tender document",
+      })
 
       await getTender({ orgId, tenderId })
 
-      const ext = path.extname(file.originalname || "") || ""
-      const safeName = (file.originalname || "upload").replace(
-        /[^a-zA-Z0-9._-]/g,
-        "_",
-      )
+      const safeName = validated.safeName
       const key = `org/${orgId}/tenders/${tenderId}/${crypto.randomUUID()}-${safeName}`
 
       const stored = await storage().putObject({
         key,
         body: file.buffer,
-        mimeType: file.mimetype,
+        mimeType: validated.mimeType,
       })
 
       const tenderFile = await (
@@ -366,12 +398,7 @@ tenderRouter.post(
         processingJobId: processingJob.id,
       }
 
-      await extractionQueue.add("extract-text", payload, {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 1500 },
-        removeOnComplete: 1000,
-        removeOnFail: 2000,
-      })
+      await enqueueExtractionJob(payload)
 
       await auditLog({
         req,
@@ -380,8 +407,13 @@ tenderRouter.post(
         userId,
         entityType: "TenderFile",
         entityId: tenderFile.id,
-        meta: { tenderId, key, mimeType: file.mimetype, sizeBytes: file.size },
-      })
+          meta: {
+            tenderId,
+            key,
+            mimeType: validated.mimeType,
+            sizeBytes: file.size,
+          },
+        })
 
       res.json(
         ok({ tenderFileId: tenderFile.id, processingJobId: processingJob.id }),

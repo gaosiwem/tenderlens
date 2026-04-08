@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { FileText, Mail, Phone, RefreshCw, User2 } from "lucide-react";
+import { Clock3, FileText, Mail, Phone, RefreshCw, User2 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
@@ -54,6 +54,13 @@ function normalizeSummaryMarkdown(raw: string) {
   });
 
   return normalized.join("\n\n").replace(/\n{3,}/g, "\n\n");
+}
+
+function toLocalDateLabel(value: string | null | undefined) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString();
 }
 
 const markdownComponents: Components = {
@@ -156,6 +163,17 @@ export default function TenderSummaryPage() {
   const summaryMarkdown = React.useMemo(
     () => normalizeSummaryMarkdown(summary?.content ?? ""),
     [summary?.content],
+  );
+  const summaryCoverage = summary?.meta?.coverage;
+  const summaryIsStale = Boolean(summary?.meta?.isStale);
+  const summaryHasNoDocumentCoverage = Boolean(
+    summaryCoverage && summaryCoverage.fileCountIncluded === 0,
+  );
+  const enquiryContacts = (deadlines?.enquiryContacts ?? []).filter(
+    (c) => c && (c.name || c.email || c.phone || c.role),
+  );
+  const latestExtractLabel = toLocalDateLabel(
+    summary?.meta?.latestExtractCreatedAt ?? null,
   );
   const showGeneratingState = !summary && (generating || forceAutoGenerate);
 
@@ -278,6 +296,21 @@ export default function TenderSummaryPage() {
                 </TLInlineAlert>
               ) : null}
 
+              {summary && summaryIsStale ? (
+                <TLInlineAlert variant="warning" title="New document data detected">
+                  {latestExtractLabel
+                    ? `A document extract updated at ${latestExtractLabel}. Refresh to regenerate this summary from the latest files.`
+                    : "A newer document extract is available. Refresh to regenerate this summary from the latest files."}
+                </TLInlineAlert>
+              ) : null}
+
+              {summary && summaryHasNoDocumentCoverage ? (
+                <TLInlineAlert variant="warning" title="No extracted documents used">
+                  This summary was generated without extracted document text.
+                  Run refresh after document extraction completes.
+                </TLInlineAlert>
+              ) : null}
+
               {!summary ? (
                 <div className="flex flex-col items-center justify-center border border-border rounded-2xl p-12 bg-background/20">
                   <FileText
@@ -315,6 +348,50 @@ export default function TenderSummaryPage() {
                           {new Date(summary.createdAt).toLocaleString()}
                         </span>
                       </div>
+                      {summaryCoverage && summaryCoverage.fileCountIncluded > 0 ? (
+                        <div className="mx-auto max-w-4xl mt-3 text-xs text-muted-foreground">
+                          Included {summaryCoverage.fileCountIncluded} document
+                          {summaryCoverage.fileCountIncluded === 1 ? "" : "s"}
+                          {" | "}
+                          {summaryCoverage.totalCharsUsed.toLocaleString()} of{" "}
+                          {summaryCoverage.totalCharsAvailable.toLocaleString()} extracted
+                          characters used
+                          {summaryCoverage.truncatedFileCount > 0
+                            ? ` | ${summaryCoverage.truncatedFileCount} file${summaryCoverage.truncatedFileCount === 1 ? "" : "s"} truncated for balance`
+                            : ""}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="tl-surface p-6 md:p-8">
+                    <div className="mx-auto max-w-4xl">
+                      <div className="font-display text-lg font-extrabold">
+                        Key Dates
+                      </div>
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        Structured dates extracted for this tender summary.
+                      </div>
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            <Clock3 className="size-3.5" />
+                            Closing Date
+                          </div>
+                          <div className="mt-3 text-sm font-medium text-foreground/90">
+                            {toLocalDateLabel(deadlines?.closingAt) || "Unavailable"}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            <Clock3 className="size-3.5" />
+                            Briefing Session
+                          </div>
+                          <div className="mt-3 text-sm font-medium text-foreground/90">
+                            {toLocalDateLabel(deadlines?.briefingAt) || "Unavailable"}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -334,7 +411,7 @@ export default function TenderSummaryPage() {
                             Contact Person
                           </div>
                           <div className="mt-3 text-sm font-medium text-foreground/90">
-                            {deadlines?.contactName || "Not explicitly stated"}
+                            {deadlines?.contactName || "Unavailable"}
                           </div>
                         </div>
                         <div className="rounded-xl border border-border/60 bg-background/40 p-4">
@@ -343,7 +420,7 @@ export default function TenderSummaryPage() {
                             Email
                           </div>
                           <div className="mt-3 text-sm font-medium text-foreground/90 break-all">
-                            {deadlines?.contactEmail || "Not explicitly stated"}
+                            {deadlines?.contactEmail || "Unavailable"}
                           </div>
                         </div>
                         <div className="rounded-xl border border-border/60 bg-background/40 p-4">
@@ -352,10 +429,40 @@ export default function TenderSummaryPage() {
                             Phone
                           </div>
                           <div className="mt-3 text-sm font-medium text-foreground/90">
-                            {deadlines?.contactPhone || "Not explicitly stated"}
+                            {deadlines?.contactPhone || "Unavailable"}
                           </div>
                         </div>
                       </div>
+                      {enquiryContacts.length > 0 ? (
+                        <div className="mt-6 rounded-xl border border-border/60 bg-background/40 p-4">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            Enquiries Contacts
+                          </div>
+                          <div className="mt-3 space-y-3">
+                            {enquiryContacts.slice(0, 8).map((contact, idx) => (
+                              <div
+                                key={`${contact.email ?? "no-email"}-${contact.phone ?? "no-phone"}-${idx}`}
+                                className="rounded-lg border border-border/50 p-3 text-sm"
+                              >
+                                <div className="font-medium text-foreground/95">
+                                  {contact.name || "Contact"}
+                                </div>
+                                <div className="text-muted-foreground mt-1">
+                                  {contact.role || "Enquiries"}
+                                </div>
+                                <div className="mt-2 space-y-1">
+                                  <div className="break-all">
+                                    Email: {contact.email || "Unavailable"}
+                                  </div>
+                                  <div>
+                                    Phone: {contact.phone || "Unavailable"}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -367,3 +474,4 @@ export default function TenderSummaryPage() {
     </TenderLensAppShell>
   );
 }
+

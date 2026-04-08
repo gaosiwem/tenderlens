@@ -18,6 +18,7 @@ model User {
   id             String          @id @default(uuid())
   email          String          @unique
   passwordHash   String?
+  mustChangePassword Boolean     @default(false)
   googleId       String?         @unique
   emailVerifiedAt DateTime?
   avatarUrl      String?
@@ -476,7 +477,7 @@ model TenderReminder {
   org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   tender Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
 
-  @@unique([tenderId, type, fireAt])
+  @@unique([orgId, tenderId, type, fireAt])
   @@index([orgId])
   @@index([tenderId])
   @@index([fireAt])
@@ -884,9 +885,6 @@ model OrgSubscription {
   plan          PlanType           @default(TRIAL)
   status        SubscriptionStatus @default(TRIALING)
 
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-
   seatsPurchased Int @default(1)
   seatsUsed      Int @default(0)
 
@@ -925,7 +923,6 @@ model BillingEvent {
 model OrgInvoice {
   id               String   @id @default(uuid())
   orgId            String
-  stripeInvoiceId  String   @unique
   status           String?
   amountDue        Int?
   amountPaid       Int?
@@ -1165,9 +1162,9 @@ model ReferralAttribution {
   orgId     String
   referralCodeId String?
   code      String?
-  stripeCheckoutSessionId String?
-  stripeCustomerId String?
-  stripeSubscriptionId String?
+  checkoutReference String?
+  customerReference String?
+  billingReference  String?
   createdAt DateTime @default(now())
 
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -1193,7 +1190,7 @@ model ReferralEarning {
   userId    String?
   referralCodeId String?
   attributedOrgId String?
-  stripeSubscriptionId String?
+  billingReference String?
   amountCents Int
   currency  String @default("ZAR")
   status    PayoutStatus @default(PENDING)
@@ -1300,7 +1297,7 @@ model PartnerAttribution {
   id                   String   @id @default(uuid())
   partnerId            String
   orgId                String
-  stripeSubscriptionId String?
+  billingReference     String?
   amountCents          Int? // optional, filled from invoice or estimate
   createdAt            DateTime @default(now())
 

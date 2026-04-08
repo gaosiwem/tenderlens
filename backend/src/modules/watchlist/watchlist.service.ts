@@ -16,7 +16,6 @@ export const WATCHLIST_REMINDER_TYPES = [
   "CLOSING_7D",
   "CLOSING_24H",
   "CLOSING_2H",
-  "BRIEFING_SESSION",
   "SITE_VISIT",
 ] as const
 
@@ -102,7 +101,7 @@ async function enforceWatchlistChannelPolicy(args: {
 
   throw new AppError(
     "PLAN_UPGRADE_REQUIRED",
-    "WhatsApp alerts are not available on your current plan.",
+    "SMS alerts are not available on your current plan.",
     403,
     {
       upgrade: true,
@@ -228,7 +227,7 @@ export async function addToWatchlist(args: {
     : await selectTemplateForTender(`${tender.title} ${tender.source ?? ""}`)
 
   if (!selectedTemplate) {
-    throw new AppError("VALIDATION_ERROR", "Template not found", 400)
+    throw new AppError("VALIDATION_ERROR", "Category not found", 400)
   }
 
   let item:
@@ -243,9 +242,8 @@ export async function addToWatchlist(args: {
     | LegacyWatchlistRow
 
   try {
-    const reminderTypes = buildDefaultWatchlistReminderTypes({
-      hasBriefingSession: Boolean(tender.deadlines?.briefingAt),
-    }) as WatchlistReminderType[]
+    const reminderTypes =
+      buildDefaultWatchlistReminderTypes() as WatchlistReminderType[]
 
     item = await prisma.watchlistItem.upsert({
       where: {

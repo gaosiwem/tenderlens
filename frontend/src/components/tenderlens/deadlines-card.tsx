@@ -64,6 +64,9 @@ export function TLDeadlinesCard(props: {
   }
 
   const cited = (d?.citations as any)?.citedChunkIds ?? [];
+  const enquiryContacts = (d?.enquiryContacts ?? []).filter(
+    (c) => c && (c.name || c.email || c.phone || c.role),
+  );
 
   return (
     <Card className="tl-surface border-border/40 overflow-hidden">
@@ -155,6 +158,35 @@ export function TLDeadlinesCard(props: {
             </div>
           </div>
         </div>
+
+        {enquiryContacts.length > 0 ? (
+          <div className="space-y-3 p-3 rounded-xl bg-muted/30 border border-border/20">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+              Enquiries Contacts
+            </div>
+            <div className="space-y-2">
+              {enquiryContacts.slice(0, 8).map((contact, idx) => (
+                <div
+                  key={`${contact.email ?? "no-email"}-${contact.phone ?? "no-phone"}-${idx}`}
+                  className="rounded-lg border border-border/30 p-3 text-sm"
+                >
+                  <div className="font-semibold text-foreground/90">
+                    {contact.name ?? "Contact"}
+                  </div>
+                  <div className="text-muted-foreground">
+                    {contact.role ?? "Enquiries"}
+                  </div>
+                  <div className="mt-1">
+                    <div className="break-all">
+                      Email: {contact.email ?? "Not found"}
+                    </div>
+                    <div>Phone: {contact.phone ?? "Not found"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-border/40">
           <div className="space-y-1.5">

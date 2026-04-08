@@ -1,11 +1,33 @@
 import { prisma } from "../../db/prisma"
-import { extractDeadlines } from "./deadlines.extractor"
+import {
+  extractDeadlines,
+  type DeadlineEnquiryContact,
+} from "./deadlines.extractor"
 import { emitEvent } from "../notifications/notifications.service"
-import { NotificationType } from "@prisma/client"
+import { NotificationType, type Prisma } from "@prisma/client"
 import { AppError } from "../../utils/responses"
-import { backfillBriefingReminderForTenderWatchers } from "../watchlist/watchlist.defaults"
 
-function buildContext(chunks: any[], maxChars: number) {
+type ContextChunk = {
+  id: string
+  content: string
+}
+
+type LatestExtractRow = {
+  tenderFileId: string
+  text: string
+  createdAt: Date
+}
+
+type DeadlineDataScope = {
+  extractWhere: Prisma.TenderExtractWhereInput
+  chunkWhere: Prisma.TenderChunkWhereInput
+  deadlineWhere: Prisma.TenderDeadlineWhereInput
+}
+
+const DEADLINES_CONTEXT_MAX_CHARS = 120_000
+const DEADLINES_EXTRACT_SEGMENT_CHARS = 3500
+
+function buildContext(chunks: ContextChunk[], maxChars: number) {
   let used = 0
   const parts: string[] = []
   for (const c of chunks) {
@@ -17,6 +39,87 @@ function buildContext(chunks: any[], maxChars: number) {
   return parts.join("")
 }
 
+function normalizeExtractText(text: string | null | undefined) {
+  return (text ?? "").replace(/\r\n/g, "\n").trim()
+}
+
+function splitTextBySize(text: string, size: number) {
+  if (!text) return []
+  const out: string[] = []
+  for (let i = 0; i < text.length; i += size) {
+    const part = text.slice(i, i + size).trim()
+    if (part) out.push(part)
+  }
+  return out
+}
+
+async function resolveDeadlineDataScope(args: { orgId: string; tenderId: string }) {
+  const tender = await prisma.tender.findFirst({
+    where: { id: args.tenderId, OR: [{ orgId: args.orgId }, { orgId: null }] },
+    select: { orgId: true },
+  })
+
+  if (!tender) throw new AppError("NOT_FOUND", "Tender not found", 404)
+
+  const isGlobalTender = tender.orgId == null
+  if (isGlobalTender) {
+    return {
+      extractWhere: { tenderId: args.tenderId },
+      chunkWhere: { tenderId: args.tenderId },
+      deadlineWhere: { tenderId: args.tenderId },
+    } satisfies DeadlineDataScope
+  }
+
+  return {
+    extractWhere: { orgId: args.orgId, tenderId: args.tenderId },
+    chunkWhere: { orgId: args.orgId, tenderId: args.tenderId },
+    deadlineWhere: { orgId: args.orgId, tenderId: args.tenderId },
+  } satisfies DeadlineDataScope
+}
+
+async function loadLatestExtractsPerFile(where: Prisma.TenderExtractWhereInput) {
+  const rows = await prisma.tenderExtract.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    select: {
+      tenderFileId: true,
+      text: true,
+      createdAt: true,
+    },
+  })
+
+  const latestByFile = new Map<string, LatestExtractRow>()
+  for (const row of rows) {
+    if (!row.tenderFileId) continue
+    if (latestByFile.has(row.tenderFileId)) continue
+    const normalized = normalizeExtractText(row.text)
+    if (!normalized) continue
+    latestByFile.set(row.tenderFileId, {
+      tenderFileId: row.tenderFileId,
+      text: normalized,
+      createdAt: row.createdAt,
+    })
+  }
+
+  return Array.from(latestByFile.values()).sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+  )
+}
+
+function buildContextChunksFromExtracts(extracts: LatestExtractRow[]) {
+  const chunks: ContextChunk[] = []
+  for (const ex of extracts) {
+    const parts = splitTextBySize(ex.text, DEADLINES_EXTRACT_SEGMENT_CHARS)
+    for (let i = 0; i < parts.length; i += 1) {
+      chunks.push({
+        id: `${ex.tenderFileId}:${i + 1}`,
+        content: parts[i],
+      })
+    }
+  }
+  return chunks
+}
+
 export function getDeadlineContactName(citations: unknown) {
   if (!citations || typeof citations !== "object") return null
   const value =
@@ -24,6 +127,41 @@ export function getDeadlineContactName(citations: unknown) {
       ? (citations as Record<string, unknown>).contactName
       : null
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
+}
+
+export function getDeadlineEnquiryContacts(citations: unknown) {
+  if (!citations || typeof citations !== "object") return []
+  const value =
+    "enquiryContacts" in (citations as Record<string, unknown>)
+      ? (citations as Record<string, unknown>).enquiryContacts
+      : null
+  if (!Array.isArray(value)) return []
+
+  const out: DeadlineEnquiryContact[] = []
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue
+    const row = item as Record<string, unknown>
+    const role =
+      typeof row.role === "string" && row.role.trim().length > 0
+        ? row.role.trim()
+        : null
+    const name =
+      typeof row.name === "string" && row.name.trim().length > 0
+        ? row.name.trim()
+        : null
+    const email =
+      typeof row.email === "string" && row.email.trim().length > 0
+        ? row.email.trim()
+        : null
+    const phone =
+      typeof row.phone === "string" && row.phone.trim().length > 0
+        ? row.phone.trim()
+        : null
+    if (!role && !name && !email && !phone) continue
+    out.push({ role, name, email, phone })
+  }
+
+  return out
 }
 
 function hasMissingContactDetails(
@@ -37,26 +175,48 @@ function hasMissingContactDetails(
     | undefined,
 ) {
   if (!deadline) return true
-  return !deadline.contactEmail || !deadline.contactPhone || !getDeadlineContactName(deadline.citations)
+  const hasPrimary =
+    Boolean(deadline.contactEmail) ||
+    Boolean(deadline.contactPhone) ||
+    Boolean(getDeadlineContactName(deadline.citations))
+  if (hasPrimary) return false
+
+  return getDeadlineEnquiryContacts(deadline.citations).length === 0
 }
 
 export async function refreshDeadlines(args: {
   orgId: string
   tenderId: string
 }) {
-  const chunks = await prisma.tenderChunk.findMany({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
-    orderBy: { index: "asc" },
-    take: 40,
-  })
-  if (!chunks.length) throw new AppError("NOT_FOUND", "No chunks found", 404)
+  const scope = await resolveDeadlineDataScope(args)
 
-  const ctx = buildContext(chunks, 120_000)
+  let contextChunks = buildContextChunksFromExtracts(
+    await loadLatestExtractsPerFile(scope.extractWhere),
+  )
+
+  if (contextChunks.length === 0) {
+    const fallbackChunks = await prisma.tenderChunk.findMany({
+      where: scope.chunkWhere,
+      orderBy: { index: "asc" },
+      take: 80,
+      select: {
+        id: true,
+        content: true,
+      },
+    })
+    contextChunks = fallbackChunks
+  }
+
+  if (!contextChunks.length) {
+    throw new AppError("NOT_FOUND", "No extracted text found", 404)
+  }
+
+  const ctx = buildContext(contextChunks, DEADLINES_CONTEXT_MAX_CHARS)
   const ex = await extractDeadlines({ questionContext: ctx })
   if (!ex) return null
 
   const prev = await prisma.tenderDeadline.findFirst({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: scope.deadlineWhere,
   })
 
   const saved = await prisma.tenderDeadline.upsert({
@@ -71,6 +231,7 @@ export async function refreshDeadlines(args: {
       citations: {
         citedChunkIds: ex.citedChunkIds,
         contactName: ex.contactName,
+        enquiryContacts: ex.enquiryContacts,
       },
     },
     create: {
@@ -85,6 +246,7 @@ export async function refreshDeadlines(args: {
       citations: {
         citedChunkIds: ex.citedChunkIds,
         contactName: ex.contactName,
+        enquiryContacts: ex.enquiryContacts,
       },
     },
   })
@@ -96,10 +258,6 @@ export async function refreshDeadlines(args: {
       (saved.briefingAt?.toISOString() ?? null) ||
     (prev?.siteVisitAt?.toISOString() ?? null) !==
       (saved.siteVisitAt?.toISOString() ?? null)
-
-  if (saved.briefingAt) {
-    await backfillBriefingReminderForTenderWatchers(args.tenderId)
-  }
 
   if (changed) {
     await emitEvent({
@@ -130,8 +288,10 @@ export async function getOrRefreshDeadlines(args: {
   orgId: string
   tenderId: string
 }) {
+  const scope = await resolveDeadlineDataScope(args)
+
   const existing = await prisma.tenderDeadline.findFirst({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: scope.deadlineWhere,
   })
 
   if (!hasMissingContactDetails(existing)) {

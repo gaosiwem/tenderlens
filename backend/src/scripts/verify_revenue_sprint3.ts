@@ -1,8 +1,5 @@
 import { prisma } from "../db/prisma"
 import { getExperimentBucket } from "../billing/experiments.service"
-// import { createCheckoutSession } from "../billing/stripe.service"
-// import { handleStripeWebhook } from "../billing/webhook"
-// import { Request, Response } from "express"
 
 async function verify() {
   console.log("Starting Revenue Sprint 3 Verification...")
@@ -91,9 +88,9 @@ async function verify() {
     data: {
       orgId: org.id,
       code: "REF123",
-      stripeCheckoutSessionId: "cs_test_manual",
-      stripeCustomerId: "cus_test",
-      stripeSubscriptionId: "sub_test",
+      checkoutReference: "checkout_test_manual",
+      customerReference: "customer_test",
+      billingReference: "billing_test",
     },
   })
 

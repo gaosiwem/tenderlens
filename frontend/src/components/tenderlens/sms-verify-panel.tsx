@@ -7,13 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { TLButton } from "@/components/tenderlens/button";
 import { TLInlineAlert } from "@/components/tenderlens/inline-alert";
-import {
-  startWhatsAppVerification,
-  verifyWhatsAppOtp,
-} from "@/lib/whatsapp.api";
+import { startSmsVerification, verifySmsOtp } from "@/lib/sms.api";
 import type { NotificationPrefs } from "@/lib/preferences.types";
 
-export function TLWhatsAppVerifyPanel(props: {
+export function TLSmsVerifyPanel(props: {
   prefs: NotificationPrefs;
   disabled?: boolean;
   onPatch: (p: Partial<NotificationPrefs>) => void;
@@ -31,18 +28,18 @@ export function TLWhatsAppVerifyPanel(props: {
   async function start() {
     if (props.disabled) {
       toast.error("Upgrade required", {
-        description: "WhatsApp alerts are not available on your current plan.",
+        description: "SMS alerts are not available on your current plan.",
       });
       return;
     }
     const num = (props.prefs.whatsappNumber ?? "").trim();
     if (!num) {
-      toast.error("Enter your WhatsApp number first");
+      toast.error("Enter your phone number first");
       return;
     }
 
     setStarting(true);
-    const res = await startWhatsAppVerification(num);
+    const res = await startSmsVerification(num);
     setStarting(false);
 
     if (!res.ok) {
@@ -56,7 +53,7 @@ export function TLWhatsAppVerifyPanel(props: {
   async function verify() {
     if (props.disabled) {
       toast.error("Upgrade required", {
-        description: "WhatsApp alerts are not available on your current plan.",
+        description: "SMS alerts are not available on your current plan.",
       });
       return;
     }
@@ -71,7 +68,7 @@ export function TLWhatsAppVerifyPanel(props: {
     }
 
     setVerifying(true);
-    const res = await verifyWhatsAppOtp(verificationId, code);
+    const res = await verifySmsOtp(verificationId, code);
     setVerifying(false);
 
     if (!res.ok) {
@@ -79,7 +76,7 @@ export function TLWhatsAppVerifyPanel(props: {
       return;
     }
 
-    toast.success("WhatsApp verified");
+    toast.success("SMS verified");
     setOtp("");
     setVerificationId(null);
     await props.onReloadPrefs();
@@ -90,12 +87,10 @@ export function TLWhatsAppVerifyPanel(props: {
       <CardContent className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-display text-sm font-extrabold">
-              WhatsApp alerts
-            </div>
+            <div className="font-display text-sm font-extrabold">SMS alerts</div>
             <div className="text-xs text-muted-foreground mt-1">
-              Requires verification to prevent abuse. WhatsApp alerts are
-              subject to your subscription plan.
+              Requires verification to prevent abuse. SMS alerts are subject to
+              your subscription plan.
             </div>
           </div>
           <Switch
@@ -109,13 +104,13 @@ export function TLWhatsAppVerifyPanel(props: {
 
         <div className="space-y-2">
           <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            WhatsApp number
+            Phone number
           </div>
           <Input
             className="h-11"
             value={props.prefs.whatsappNumber ?? ""}
             onChange={(e) => props.onPatch({ whatsappNumber: e.target.value })}
-            placeholder='Example: "whatsapp:+27xxxxxxxxx"'
+            placeholder='Example: "+27xxxxxxxxx"'
             disabled={props.disabled}
           />
           {verifiedAt ? (
@@ -129,7 +124,7 @@ export function TLWhatsAppVerifyPanel(props: {
           )}
           {props.disabled ? (
             <div className="text-xs text-amber-600 dark:text-amber-400">
-              WhatsApp alerts are not available on your current plan.
+              SMS alerts are not available on your current plan.
             </div>
           ) : null}
         </div>
@@ -138,7 +133,7 @@ export function TLWhatsAppVerifyPanel(props: {
           <div className="space-y-3">
             <TLInlineAlert
               title="Verification required"
-              description="Tap Send code. You will receive an OTP on WhatsApp. Enter it below to verify."
+              description="Tap Send code. You will receive an SMS OTP. Enter it below to verify."
               tone="neutral"
             />
 
@@ -155,7 +150,10 @@ export function TLWhatsAppVerifyPanel(props: {
                     onChange={(e) => setOtp(e.target.value)}
                     placeholder="Enter OTP"
                   />
-                  <TLButton onClick={verify} disabled={verifying || props.disabled}>
+                  <TLButton
+                    onClick={verify}
+                    disabled={verifying || props.disabled}
+                  >
                     {verifying ? "Verifying..." : "Verify"}
                   </TLButton>
                 </div>

@@ -31,3 +31,9 @@ export const resetPasswordSchema = z.object({
   token: z.string().min(10),
   newPassword: z.string().min(8).max(200)
 })
+
+export const completeInvitePasswordSchema = z.object({
+  email: z.string().email().transform((s) => s.toLowerCase().trim()),
+  temporaryPassword: z.string().min(8).max(200),
+  newPassword: z.string().min(8).max(200),
+})

@@ -41,7 +41,7 @@ export function TLInvoiceList(props: { items: OrgInvoice[] }) {
           <div className="divide-y divide-border/30">
             {props.items.map((inv) => (
               <div
-                key={inv.stripeInvoiceId}
+                key={inv.id}
                 className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-muted/30 transition-colors"
               >
                 <div className="space-y-1">

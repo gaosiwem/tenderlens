@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { io, Socket } from "socket.io-client";
+import { baseUrl, ensureAccessToken } from "@/lib/api";
 
 export function useWorkspaceSocket(
   workspaceId: string | null,
@@ -12,38 +13,46 @@ export function useWorkspaceSocket(
   React.useEffect(() => {
     if (!workspaceId) return;
 
-    // Ensure we connect to the right URL. The backend might be on a different port in dev.
-    // Assuming /socket.io is proxied or absolute path is needed.
-    // For now, let's try relative path if checking backend locally.
-    const socket = io(
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
-      {
+    let cancelled = false;
+
+    async function connect() {
+      const { token } = await ensureAccessToken();
+      if (!token || cancelled) return;
+
+      const socket = io(baseUrl, {
         path: "/socket.io",
+        auth: { token },
         withCredentials: true,
         transports: ["websocket", "polling"],
-      },
-    );
+      });
 
-    socketRef.current = socket;
+      socketRef.current = socket;
 
-    socket.on("connect", () => {
-      socket.emit("workspace:join", { workspaceId });
-    });
+      socket.on("connect", () => {
+        socket.emit("workspace:join", { workspaceId });
+      });
 
-    const events = [
-      "task:created",
-      "task:updated",
-      "task:commented",
-      "attachment:added",
-      "workspace:updated",
-    ];
-    for (const ev of events) {
-      socket.on(ev, (data) => onEvent(ev, data));
+      const events = [
+        "task:created",
+        "task:updated",
+        "task:commented",
+        "attachment:added",
+        "workspace:updated",
+      ];
+      for (const ev of events) {
+        socket.on(ev, (data) => onEvent(ev, data));
+      }
     }
+    void connect();
 
     return () => {
-      socket.emit("workspace:leave", { workspaceId });
-      socket.disconnect();
+      cancelled = true;
+      const socket = socketRef.current;
+      if (socket) {
+        socket.emit("workspace:leave", { workspaceId });
+        socket.disconnect();
+      }
+      socketRef.current = null;
     };
   }, [workspaceId, onEvent]);
 }

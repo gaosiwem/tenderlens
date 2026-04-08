@@ -27,22 +27,18 @@ import { preferencesRouter } from "./modules/preferences/preferences.routes"
 import { deadlinesRouter } from "./modules/deadlines/deadlines.routes"
 import { timelineRouter } from "./modules/tenders/timeline.routes"
 import { alertsRouter } from "./modules/alerts/alerts.routes"
-import { subscriptionsRouter } from "./modules/subscriptions/subscriptions.routes"
-import { subscriptionsReadRouter } from "./modules/subscriptions/subscriptions.read.routes"
 import { deliveriesRouter } from "./modules/notifications/deliveries.routes"
-import { whatsappVerificationRouter } from "./modules/whatsapp/verification.routes"
+import { smsVerificationRouter } from "./modules/whatsapp/verification.routes"
 import { templatesRouter } from "./modules/watchlist/templates.routes"
 import { aiRouter } from "./modules/tenders/ai.routes"
 import { workspaceRouter } from "./modules/workspace/workspace.routes"
 import { orgDocsRouter } from "./modules/orgDocs/orgDocs.routes"
-import { handleStripeWebhook } from "./billing/webhook"
 import { attachmentsRouter } from "./modules/attachments/attachments.routes"
 import { riskRouter } from "./modules/risk/risk.routes"
 import { invitesRouter } from "./modules/org/invites.routes"
 import { inviteAcceptRouter } from "./modules/org/invites.accept"
 import { experimentsRouter } from "./billing/experiments.routes"
 import { referralsRouter } from "./billing/referrals.routes"
-import { inAppBillingRouter } from "./billing/inAppBilling.routes"
 import { referralPayoutRouter } from "./billing/referralPayout.routes"
 import { onboardingRouter } from "./billing/onboarding.routes"
 import { experimentsV2Router } from "./billing/experimentsV2.routes"
@@ -54,57 +50,54 @@ import { billingAnalyticsRouter } from "./admin/billing-analytics.routes"
 import { businessAdminRouter } from "./admin/business-admin.routes"
 import { settingsRouter } from "./modules/settings/settings.routes"
 import { businessRouter } from "./modules/business/business.routes"
-import path from "path"
-import { ok, fail } from "./utils/responses"
+import { ok, fail, AppError } from "./utils/responses"
 
 export function createApp() {
   const app = express()
+  const allowedOrigins = env.CORS_ORIGINS
+  const allowNoOriginPaths = new Set(env.CORS_ALLOW_NO_ORIGIN_PATHS)
+  const corsOptions = {
+    credentials: true,
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-org-id",
+      "x-request-id",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  }
 
   app.use(requestIdMiddleware)
   app.use(
-    cors({
-      origin: (origin, cb) => {
-        // Allow requests with no origin (like mobile apps or curl)
-        if (!origin) return cb(null, true)
+    cors((req, cb) => {
+      const origin = req.header("origin") ?? ""
+      const path = req.path || req.originalUrl || ""
 
-        // Clean up origins (trim whitespace)
-        const allowed = env.CORS_ORIGINS.map((o) => o.trim())
-
-        if (allowed.length === 0 || allowed.includes(origin)) {
-          return cb(null, true)
+      if (!origin) {
+        if (allowNoOriginPaths.has(path)) {
+          return cb(null, corsOptions)
         }
 
-        logger.warn({ origin, allowed }, "CORS blocked")
-        return cb(new Error("CORS blocked"))
-      },
-      credentials: true,
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "x-org-id",
-        "x-request-id",
-      ],
-      methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-      preflightContinue: false,
-      optionsSuccessStatus: 204,
+        logger.warn({ path }, "CORS blocked: missing origin")
+        return cb(new AppError("FORBIDDEN", "CORS blocked", 403))
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return cb(null, {
+          ...corsOptions,
+          origin,
+        })
+      }
+
+      logger.warn({ origin, allowedOrigins, path }, "CORS blocked")
+      return cb(new AppError("FORBIDDEN", "CORS blocked", 403))
     }),
   )
   app.use(pinoHttp({ logger }))
   app.use(helmet())
   app.use(generalLimiter)
-
-  app.post(
-    "/api/v1/stripe/webhook",
-    express.raw({ type: "application/json" }),
-    async (req, res, next) => {
-      try {
-        ;(req as any).rawBody = req.body
-        await handleStripeWebhook(req, res)
-      } catch (e) {
-        next(e)
-      }
-    },
-  )
 
   app.use(express.json({ limit: "1mb" }))
   app.use(requestLogMiddleware)
@@ -135,13 +128,11 @@ export function createApp() {
   app.use("/api/v1/notifications/history", deliveriesRouter)
   app.use("/api/v1/export", exportRouter)
   app.use("/api/v1/alerts", alertsRouter)
-  app.use("/api/v1/subscriptions", subscriptionsRouter)
-  app.use("/api/v1/subscriptions", subscriptionsReadRouter)
   app.use("/api/v1/watchlist", watchlistRouter)
   app.use("/api/v1/preferences", preferencesRouter)
   app.use("/api/v1/deadlines", deadlinesRouter)
   app.use("/api/v1", timelineRouter)
-  app.use("/api/v1/whatsapp", whatsappVerificationRouter)
+  app.use("/api/v1/sms", smsVerificationRouter)
   app.use("/api/v1/templates", templatesRouter)
   app.use("/api/v1/ai", aiRouter)
   app.use("/api/v1/org-docs", orgDocsRouter)
@@ -158,8 +149,7 @@ export function createApp() {
   app.use("/api/v1/billing/experiments", experimentsRouter)
   app.use("/api/v1/referrals", referralsRouter)
 
-  // Sprint 4 - Revenue: In-App Billing, Referral Payouts, Segmentation, Onboarding
-  app.use("/api/v1/billing", inAppBillingRouter)
+  // Sprint 4 - Revenue: Referral Payouts, Segmentation, Onboarding
   app.use("/api/v1/referrals", referralPayoutRouter)
   app.use("/api/v1/onboarding", onboardingRouter)
   app.use("/api/v1/billing", experimentsV2Router)
@@ -172,8 +162,6 @@ export function createApp() {
   app.use("/api/v1/admin/business", businessAdminRouter)
   app.use("/api/v1/billing/events", billingAnalyticsRouter)
   app.use("/api/v1/admin/settings", settingsRouter)
-
-  app.use("/media", express.static(path.join(process.cwd(), "media")))
 
   app.use(errorMiddleware)
 

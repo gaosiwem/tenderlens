@@ -2,14 +2,18 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { TenderLensAppShell } from "@/components/tenderlens/app-shell";
 import { TLSection } from "@/components/tenderlens/section";
 import { TLButton } from "@/components/tenderlens/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TLCardSkeleton } from "@/components/tenderlens/skeleton-blocks";
-import { getWorkspaceByTender, updateWorkspace } from "@/lib/workspace.api";
+import {
+  deleteWorkspace,
+  getWorkspaceByTender,
+  updateWorkspace,
+} from "@/lib/workspace.api";
 import { apiFetch } from "@/lib/api";
 import type {
   BidActivity,
@@ -28,20 +32,88 @@ import { TLRiskCard } from "@/components/tenderlens/risk-card";
 import { useWorkspaceSocket } from "@/hooks/use-workspace-socket";
 import { downloadBlob } from "@/lib/download-blob";
 import { TLPaywallGuard } from "@/components/tenderlens/paywall-guard";
+import { useAuth } from "@/lib/auth";
 import {
   ArrowLeftIcon,
   FileDownIcon,
   PlusIcon,
   RefreshCcwIcon,
   TableIcon,
+  Trash2Icon,
 } from "lucide-react";
+
+type WorkspaceLoadError = {
+  code: string;
+  title: string;
+  description: string;
+};
+
+function describeWorkspaceError(
+  code: string,
+  fallbackMessage: string,
+): WorkspaceLoadError {
+  const normalized = (code || "UNKNOWN").toUpperCase();
+
+  if (
+    normalized === "PLAN_UPGRADE_REQUIRED" ||
+    normalized === "TRIAL_EXPIRED" ||
+    normalized === "PLAN_EXPIRED" ||
+    normalized === "PLAN_PAST_DUE"
+  ) {
+    return {
+      code: normalized,
+      title: "Workspace blocked by subscription",
+      description:
+        "Your current plan or billing state does not allow workspace tasks for this organization.",
+    };
+  }
+
+  if (normalized === "FORBIDDEN" || normalized === "UNAUTHORIZED") {
+    return {
+      code: normalized,
+      title: "Workspace access denied",
+      description:
+        "Your current organization role does not have access to this workspace.",
+    };
+  }
+
+  if (normalized === "NOT_FOUND") {
+    return {
+      code: normalized,
+      title: "Workspace not found for active organization",
+      description:
+        "This tender may be in a different organization context. Switch organization and try again.",
+    };
+  }
+
+  return {
+    code: normalized,
+    title: "Workspace unavailable",
+    description:
+      fallbackMessage ||
+      "The workspace could not be loaded due to an unexpected error.",
+  };
+}
 
 export default function WorkspacePage() {
   const params = useParams();
+  const router = useRouter();
+  const auth = useAuth();
   const tenderId = String(params.tenderId);
+  const activeOrgId =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("tl_active_org_id")
+      : null;
+  const currentOrgRole =
+    auth.me?.orgs.find((membership) => membership.org.id === activeOrgId)?.role ??
+    null;
+  const canDeleteWorkspace =
+    currentOrgRole === "OWNER" || currentOrgRole === "ADMIN";
 
   const [loading, setLoading] = React.useState(true);
   const [workspace, setWorkspace] = React.useState<BidWorkspace | null>(null);
+  const [workspaceError, setWorkspaceError] =
+    React.useState<WorkspaceLoadError | null>(null);
   const [tasks, setTasks] = React.useState<BidTask[]>([]);
   const [activity, setActivity] = React.useState<BidActivity[]>([]);
   const [attachments, setAttachments] = React.useState<BidAttachment[]>([]);
@@ -50,12 +122,14 @@ export default function WorkspacePage() {
     null,
   );
   const [savingDecision, setSavingDecision] = React.useState<string | null>(null);
+  const [deletingWorkspace, setDeletingWorkspace] = React.useState(false);
 
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [editingTask, setEditingTask] = React.useState<BidTask | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
+    setWorkspaceError(null);
     const [workspaceRes, tenderRes] = await Promise.all([
       getWorkspaceByTender(tenderId),
       apiFetch<Tender>(`/api/v1/tenders/${tenderId}`, { method: "GET" }),
@@ -67,8 +141,13 @@ export default function WorkspacePage() {
     }
 
     if (!workspaceRes.ok) {
+      const issue = describeWorkspaceError(
+        workspaceRes.error.code,
+        workspaceRes.error.message,
+      );
+      setWorkspaceError(issue);
       toast.error("Failed to load workspace", {
-        description: workspaceRes.error.message,
+        description: issue.description,
       });
       setWorkspace(null);
       setTasks([]);
@@ -78,6 +157,7 @@ export default function WorkspacePage() {
     }
 
     setWorkspace(workspaceRes.data.workspace);
+    setWorkspaceError(null);
     setTasks(workspaceRes.data.tasks);
     setActivity(workspaceRes.data.activity);
     setAttachments(workspaceRes.data.attachments);
@@ -121,13 +201,41 @@ export default function WorkspacePage() {
     await load();
   }
 
+  async function handleDeleteWorkspace() {
+    if (!workspace) return;
+    const confirmed = window.confirm(
+      `Delete the workspace for "${tenderTitle || "this tender"}"? This removes its tasks, comments, activity, and attachments.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingWorkspace(true);
+    const res = await deleteWorkspace(tenderId);
+    setDeletingWorkspace(false);
+
+    if (!res.ok) {
+      toast.error("Failed to delete workspace", {
+        description: res.error.message,
+      });
+      return;
+    }
+
+    if (!res.data.deleted) {
+      toast.info("No workspace to delete");
+      return;
+    }
+
+    toast.success("Workspace deleted");
+    router.push("/workspace");
+  }
+
   const status = workspace?.status ?? "DRAFT";
   const decision = workspace?.decision ?? null;
 
   return (
     <TenderLensAppShell
-      title="Bid Workspace"
-      subtitle={tenderTitle || "Execution & Collaboration"}
+      title="TenderLens"
+      subtitle="Workspace"
+      description={tenderTitle || "Execution & Collaboration"}
       actions={
         <div className="flex items-center gap-2">
           <Link href={`/tenders/${tenderId}`}>
@@ -217,10 +325,23 @@ export default function WorkspacePage() {
         {!workspace && !loading ? (
           <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-2xl bg-background/20 opacity-60">
             <div className="text-sm font-semibold mb-1">
-              Workspace not available
+              {workspaceError?.title ?? "Workspace not available"}
             </div>
             <div className="text-xs text-muted-foreground text-center max-w-[200px]">
-              It seems this tender does not have an active workspace yet.
+              {workspaceError?.description ??
+                "It seems this tender does not have an active workspace yet."}
+            </div>
+            {workspaceError?.code ? (
+              <div className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Error code: {workspaceError.code}
+              </div>
+            ) : null}
+            <div className="mt-4">
+              <Link href={`/tenders/${tenderId}`}>
+                <TLButton variant="outline" size="sm">
+                  Back to Tender
+                </TLButton>
+              </Link>
             </div>
           </div>
         ) : null}
@@ -232,8 +353,18 @@ export default function WorkspacePage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     {tenderTitle ? (
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground mb-2">
-                        Tender: {tenderTitle}
+                      <div className="min-w-0 w-full text-sm">
+                        <Link
+                          href={`/tenders/${tenderId}`}
+                          className="block rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                        >
+                          <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                            Tender Title
+                          </div>
+                          <h1 className="text-sm font-bold tracking-tight text-foreground/90 md:text-base break-words">
+                            {tenderTitle}
+                          </h1>
+                        </Link>
                       </div>
                     ) : null}
                     <div className="font-display text-base font-extrabold uppercase tracking-tight">
@@ -313,6 +444,17 @@ export default function WorkspacePage() {
                         Clear
                       </button>
                     </div>
+                    {canDeleteWorkspace ? (
+                      <TLButton
+                        variant="outline"
+                        size="sm"
+                        iconLeft={<Trash2Icon size={14} />}
+                        loading={deletingWorkspace}
+                        onClick={() => void handleDeleteWorkspace()}
+                      >
+                        Delete Workspace
+                      </TLButton>
+                    ) : null}
                   </div>
                 </div>
               </CardContent>

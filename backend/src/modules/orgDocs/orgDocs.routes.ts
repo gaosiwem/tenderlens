@@ -8,7 +8,7 @@ import { requireRole } from "../../middleware/rbac.middleware"
 import { ok, AppError } from "../../utils/responses"
 import { prisma } from "../../db/prisma"
 import { storage } from "../storage/storage"
-import { extractionQueue } from "../queue/queue"
+import { extractionQueue, enqueueExtractionJob } from "../queue/queue"
 import type { ExtractJobPayload } from "../queue/jobs"
 import { createProcessingJob } from "../tenders/tender.service"
 import { JobStatus, TenderStatus } from "@prisma/client"
@@ -16,6 +16,7 @@ import {
   ORG_PROFILE_TENDER_SOURCE,
   ORG_PROFILE_TENDER_TITLE,
 } from "./orgDocs.constants"
+import { validateUploadedFile } from "../../utils/uploadValidation"
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -27,6 +28,82 @@ const allowedMime = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
 ])
+
+async function loadQueuedExtractionProcessingJobIds() {
+  const queueJobs = await extractionQueue.getJobs(
+    ["waiting", "active", "delayed"],
+    0,
+    500,
+  )
+
+  const bullJobIds = new Set<string>()
+  const processingJobIds = new Set<string>()
+
+  for (const queueJob of queueJobs) {
+    bullJobIds.add(String(queueJob.id))
+    const payload = queueJob.data as Partial<ExtractJobPayload> | undefined
+    if (typeof payload?.processingJobId === "string") {
+      processingJobIds.add(payload.processingJobId)
+    }
+  }
+
+  return { bullJobIds, processingJobIds }
+}
+
+async function reconcileProfileProcessingJobs(args: {
+  orgId: string
+  activeJobs: Array<{
+    id: string
+    tenderId: string
+    tenderFileId: string
+  }>
+  extractedFileIds: Set<string>
+}) {
+  if (args.activeJobs.length === 0) return
+
+  const queuedJobs = await loadQueuedExtractionProcessingJobIds()
+
+  for (const job of args.activeJobs) {
+    if (args.extractedFileIds.has(job.tenderFileId)) {
+      await prisma.processingJob.update({
+        where: { id: job.id },
+        data: {
+          status: JobStatus.COMPLETED,
+          completedAt: new Date(),
+          lastError: null,
+        },
+      })
+      continue
+    }
+
+    const existsInQueue =
+      queuedJobs.bullJobIds.has(job.id) ||
+      queuedJobs.processingJobIds.has(job.id)
+
+    if (existsInQueue) continue
+
+    const payload: ExtractJobPayload = {
+      orgId: args.orgId,
+      tenderId: job.tenderId,
+      tenderFileId: job.tenderFileId,
+      processingJobId: job.id,
+    }
+
+    await prisma.processingJob.update({
+      where: { id: job.id },
+      data: {
+        status: JobStatus.QUEUED,
+        startedAt: null,
+        completedAt: null,
+        lastError: null,
+      },
+    })
+
+    await enqueueExtractionJob(payload)
+    queuedJobs.bullJobIds.add(job.id)
+    queuedJobs.processingJobIds.add(job.id)
+  }
+}
 
 async function getOrCreateProfileTender(args: { orgId: string; userId: string }) {
   const existing = await prisma.tender.findFirst({
@@ -76,7 +153,7 @@ orgDocsRouter.get(
         )
       }
 
-      const [items, extractCount, activeJobs] = await Promise.all([
+      const [items, activeJobs] = await Promise.all([
         prisma.tenderFile.findMany({
           where: { orgId, tenderId: profile.id },
           orderBy: { createdAt: "desc" },
@@ -89,20 +166,23 @@ orgDocsRouter.get(
             createdAt: true,
           },
         }),
-        prisma.tenderExtract.count({
-          where: { orgId, tenderId: profile.id },
-        }),
-        prisma.processingJob.count({
+        prisma.processingJob.findMany({
           where: {
             orgId,
             tenderId: profile.id,
             status: { in: [JobStatus.QUEUED, JobStatus.PROCESSING] },
           },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            tenderId: true,
+            tenderFileId: true,
+          },
         }),
       ])
 
       const fileIds = items.map((item) => item.id)
-      const [extractFiles, jobs] =
+      const [extractFiles] =
         fileIds.length > 0
           ? await Promise.all([
               prisma.tenderExtract.findMany({
@@ -114,23 +194,44 @@ orgDocsRouter.get(
                 select: { tenderFileId: true },
                 distinct: ["tenderFileId"],
               }),
-              prisma.processingJob.findMany({
-                where: {
-                  orgId,
-                  tenderId: profile.id,
-                  tenderFileId: { in: fileIds },
-                },
-                orderBy: { createdAt: "desc" },
-                select: {
-                  tenderFileId: true,
-                  status: true,
-                  lastError: true,
-                },
-              }),
             ])
-          : [[], []]
+          : [[]]
 
       const extractedFileIds = new Set(extractFiles.map((row) => row.tenderFileId))
+      await reconcileProfileProcessingJobs({
+        orgId,
+        activeJobs,
+        extractedFileIds,
+      })
+
+      const [extractCount, activeJobCount, jobs] = await Promise.all([
+        prisma.tenderExtract.count({
+          where: { orgId, tenderId: profile.id },
+        }),
+        prisma.processingJob.count({
+          where: {
+            orgId,
+            tenderId: profile.id,
+            status: { in: [JobStatus.QUEUED, JobStatus.PROCESSING] },
+          },
+        }),
+        fileIds.length > 0
+          ? prisma.processingJob.findMany({
+              where: {
+                orgId,
+                tenderId: profile.id,
+                tenderFileId: { in: fileIds },
+              },
+              orderBy: { createdAt: "desc" },
+              select: {
+                tenderFileId: true,
+                status: true,
+                lastError: true,
+              },
+            })
+          : Promise.resolve([]),
+      ])
+
       const latestJobByFile = new Map<
         string,
         { status: JobStatus; lastError: string | null }
@@ -165,8 +266,8 @@ orgDocsRouter.get(
       return res.json(
         ok({
           profileTenderId: profile.id,
-          ready: extractCount > 0 && activeJobs === 0,
-          processing: activeJobs > 0,
+          ready: extractCount > 0 && activeJobCount === 0,
+          processing: activeJobCount > 0,
           items: itemsWithStatus,
         }),
       )
@@ -189,15 +290,14 @@ orgDocsRouter.post(
       const file = (req as any).file
 
       if (!file) throw new AppError("VALIDATION_ERROR", "Missing file", 400)
-      if (!allowedMime.has(file.mimetype)) {
-        throw new AppError("VALIDATION_ERROR", "Unsupported file type", 400)
-      }
+      const validated = validateUploadedFile({
+        file,
+        allowedMimeTypes: allowedMime,
+        fileLabel: "Business document",
+      })
 
       const profileTenderId = await getOrCreateProfileTender({ orgId, userId })
-      const safeName = (file.originalname || "org-document").replace(
-        /[^a-zA-Z0-9._-]/g,
-        "_",
-      )
+      const safeName = validated.safeName
       const ext = path.extname(file.originalname || "")
       const baseName = ext ? safeName.slice(0, -ext.length) : safeName
       const key = `org/${orgId}/org-profile/${crypto.randomUUID()}-${baseName}${ext}`
@@ -205,7 +305,7 @@ orgDocsRouter.post(
       const stored = await storage().putObject({
         key,
         body: file.buffer,
-        mimeType: file.mimetype,
+        mimeType: validated.mimeType,
       })
 
       const tenderFile = await prisma.tenderFile.create({
@@ -233,12 +333,7 @@ orgDocsRouter.post(
         processingJobId: processingJob.id,
       }
 
-      await extractionQueue.add("extract-text", payload, {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 1500 },
-        removeOnComplete: 1000,
-        removeOnFail: 2000,
-      })
+      await enqueueExtractionJob(payload)
 
       return res.json(
         ok({

@@ -1,6 +1,7 @@
 import { prisma } from "../../db/prisma"
 import { AppError } from "../../utils/responses"
 import { Prisma } from "@prisma/client"
+import { storage } from "../storage/storage"
 
 function isUniqueConstraintError(error: unknown) {
   return (
@@ -148,6 +149,36 @@ export async function updateWorkspace(args: {
   }
 
   return updated
+}
+
+export async function deleteWorkspace(args: {
+  orgId: string
+  tenderId: string
+}) {
+  const workspace = await prisma.bidWorkspace.findFirst({
+    where: { orgId: args.orgId, tenderId: args.tenderId },
+    include: {
+      attachments: {
+        select: { storageKey: true },
+      },
+    },
+  })
+
+  if (!workspace) {
+    return { deleted: false as const, workspaceId: null }
+  }
+
+  await Promise.allSettled(
+    workspace.attachments.map((attachment) =>
+      storage().deleteObject({ key: attachment.storageKey }),
+    ),
+  )
+
+  await prisma.bidWorkspace.delete({
+    where: { id: workspace.id },
+  })
+
+  return { deleted: true as const, workspaceId: workspace.id }
 }
 
 export async function logActivity(args: {

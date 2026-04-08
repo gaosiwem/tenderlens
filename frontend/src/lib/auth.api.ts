@@ -27,3 +27,14 @@ export async function resendVerification(email: string) {
     body: JSON.stringify({ email }),
   });
 }
+
+export async function completeInvitePassword(
+  email: string,
+  temporaryPassword: string,
+  newPassword: string,
+) {
+  return apiFetch<{ accessToken: string }>("/api/v1/auth/complete-invite-password", {
+    method: "POST",
+    body: JSON.stringify({ email, temporaryPassword, newPassword }),
+  });
+}

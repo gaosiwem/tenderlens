@@ -10,6 +10,7 @@ import {
   resendVerificationSchema,
   googleLoginSchema,
   resetPasswordSchema,
+  completeInvitePasswordSchema,
 } from "./auth.schemas"
 import {
   registerUser,
@@ -21,6 +22,7 @@ import {
   resendEmailVerification,
   loginWithGoogle,
   resetPassword,
+  completeInvitePassword,
 } from "./auth.service"
 import { auditLog } from "../audit/audit.service"
 import { env } from "../../config/env"
@@ -272,3 +274,31 @@ authRouter.post("/reset-password", authLimiter, async (req, res, next) => {
     next(e)
   }
 })
+
+authRouter.post(
+  "/complete-invite-password",
+  authLimiter,
+  async (req, res, next) => {
+    try {
+      const body = completeInvitePasswordSchema.parse(req.body)
+      const out = await completeInvitePassword(body)
+
+      setRefreshCookie(res, out.refreshToken)
+
+      await auditLog({
+        req,
+        action: "AUTH_INVITE_PASSWORD_COMPLETED",
+        userId: out.user.id,
+        meta: { email: out.user.email },
+      })
+
+      res.json(ok({ accessToken: out.accessToken }))
+    } catch (e: any) {
+      if (e?.name === "ZodError")
+        return next(
+          new AppError("VALIDATION_ERROR", "Invalid input", 400, e.flatten()),
+        )
+      next(e)
+    }
+  },
+)

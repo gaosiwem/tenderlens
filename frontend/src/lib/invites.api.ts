@@ -15,3 +15,28 @@ export async function acceptInvite(token: string) {
     { method: "POST" },
   );
 }
+
+export async function getInviteInfo(token: string) {
+  return apiFetch<{
+    token: string;
+    email: string;
+    role: string;
+    expiresAt: string;
+    org: { id: string; name: string };
+  }>(`/api/v1/orgs/invites/${token}`, {
+    method: "GET",
+    skipAuthRefresh: true,
+  });
+}
+
+export async function acceptInviteAnonymous(token: string) {
+  return apiFetch<{
+    joined: boolean;
+    orgId: string;
+    provisionalAccountCreated: boolean;
+    email: string;
+  }>(`/api/v1/orgs/invites/${token}/accept-anonymous`, {
+    method: "POST",
+    skipAuthRefresh: true,
+  });
+}

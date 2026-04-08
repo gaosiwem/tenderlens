@@ -20,7 +20,7 @@ export function TLTemplateCard(props: {
     setApplying(false);
 
     if (!res.ok) {
-      toast.error("Failed to apply template", {
+      toast.error("Failed to apply category", {
         description: res.error.message,
       });
       return;
@@ -28,11 +28,11 @@ export function TLTemplateCard(props: {
 
     const { addedCount } = res.data as any;
 
-    toast.success("Template applied", {
+    toast.success("Category applied", {
       description:
         addedCount > 0
-          ? `Applied ${props.t.name} and added ${addedCount} existing tenders to your watchlist.`
-          : `Applied ${props.t.name} for future monitoring.`,
+          ? `Applied ${props.t.name} category and added ${addedCount} existing tenders to your watchlist.`
+          : `Applied ${props.t.name} category for future monitoring.`,
     });
 
     // Dispatch global refresh
@@ -56,7 +56,7 @@ export function TLTemplateCard(props: {
           ))}
         </div>
         <TLButton onClick={apply} disabled={applying}>
-          {applying ? "Applying..." : "Apply template"}
+          {applying ? "Applying..." : "Apply category"}
         </TLButton>
       </CardContent>
     </Card>

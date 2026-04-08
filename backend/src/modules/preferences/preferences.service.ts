@@ -39,7 +39,7 @@ export async function updatePrefs(args: {
     if (!cfg.whatsapp) {
       throw new AppError(
         "PLAN_UPGRADE_REQUIRED",
-        "WhatsApp alerts are not available on your current plan.",
+        "SMS alerts are not available on your current plan.",
         403,
         { upgrade: true, limitType: "alerts" },
       )

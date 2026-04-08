@@ -5,32 +5,40 @@ import { requireRole } from "../../middleware/rbac.middleware"
 import { ok, AppError } from "../../utils/responses"
 import { startVerification, verifyOtp } from "./verification.service"
 
-export const whatsappVerificationRouter = Router()
+export const smsVerificationRouter = Router()
 
-whatsappVerificationRouter.post(
+smsVerificationRouter.post(
   "/start",
   requireAuth,
   requireOrgMembership,
   requireRole("VIEWER"),
   async (req, res, next) => {
     try {
-      const whatsappNumber = String(req.body?.whatsappNumber ?? "").trim()
-      if (!whatsappNumber) {
-        throw new AppError("VALIDATION_ERROR", "whatsappNumber required", 400)
+      const phoneNumber = String(
+        req.body?.phoneNumber ?? req.body?.whatsappNumber ?? "",
+      ).trim()
+      if (!phoneNumber) {
+        throw new AppError("VALIDATION_ERROR", "phoneNumber required", 400)
       }
       const out = await startVerification({
         orgId: req.orgId!,
         userId: req.auth!.userId,
-        whatsappNumber,
+        whatsappNumber: phoneNumber,
       })
-      res.json(ok(out))
+      res.json(
+        ok({
+          verificationId: out.verificationId,
+          expiresAt: out.expiresAt,
+          phoneNumber,
+        }),
+      )
     } catch (e) {
       next(e)
     }
   },
 )
 
-whatsappVerificationRouter.post(
+smsVerificationRouter.post(
   "/verify",
   requireAuth,
   requireOrgMembership,

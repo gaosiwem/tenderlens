@@ -1,4 +1,4 @@
-import { apiFetch, baseUrl, getAccessToken, getActiveOrgId } from "./api";
+import { apiFetch, baseUrl, ensureAccessToken, getActiveOrgId } from "./api";
 
 export async function triggerETendersScrape(params: {
   limit: number;
@@ -55,7 +55,7 @@ export function triggerETendersScrapeStream(args: {
       stream: "true",
     });
 
-    const token = getAccessToken();
+    const { token } = await ensureAccessToken();
     const orgId = getActiveOrgId();
 
     const headers: Record<string, string> = {

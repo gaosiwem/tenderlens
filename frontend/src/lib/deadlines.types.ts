@@ -1,3 +1,10 @@
+export type TenderEnquiryContact = {
+  role: string | null;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
 export type TenderDeadlines = {
   id: string;
   orgId: string;
@@ -8,6 +15,7 @@ export type TenderDeadlines = {
   contactName?: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  enquiryContacts?: TenderEnquiryContact[];
   confidence: number;
   citations: unknown | null;
   extractedAt: string;

@@ -9,11 +9,7 @@ type BrandLogoProps = {
   size?: "sidebar" | "mobile" | "auth";
 };
 
-const sizeClasses: Record<NonNullable<BrandLogoProps["size"]>, string> = {
-  sidebar: "w-28 xl:w-32",
-  mobile: "w-20 sm:w-24",
-  auth: "w-32 sm:w-40",
-};
+
 
 export function BrandLogo({
   className,
@@ -21,22 +17,29 @@ export function BrandLogo({
   size = "sidebar",
 }: BrandLogoProps) {
   return (
-    <div
-      className={cn(
-        "relative shrink-0 overflow-hidden",
-        "aspect-[3/2]",
-        sizeClasses[size],
-        className,
-      )}
-    >
-      <Image
-        src="/Logo.png"
-        alt="TenderLens"
-        fill
-        priority={priority}
-        sizes="(max-width: 640px) 96px, (max-width: 1024px) 112px, 128px"
-        className="object-contain"
-      />
+    <div className={cn("flex items-center gap-2.5", className)}>
+      <div
+        className={cn(
+          "relative shrink-0",
+          size === "sidebar" ? "h-8 w-8" : size === "auth" ? "h-10 w-10" : "h-7 w-7",
+        )}
+      >
+        <Image
+          src="/Logo.svg"
+          alt="TenderLens Icon"
+          fill
+          priority={priority}
+          className="object-contain"
+        />
+      </div>
+      <span
+        className={cn(
+          "font-extrabold tracking-tight text-foreground",
+          size === "sidebar" ? "text-xl" : size === "auth" ? "text-2xl" : "text-lg",
+        )}
+      >
+        Tender<span className="text-primary font-inherit">Lens</span>
+      </span>
     </div>
   );
 }

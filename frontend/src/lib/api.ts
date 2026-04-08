@@ -1,3 +1,5 @@
+import { captureFrontendApiError } from "@/lib/monitoring/sentry";
+
 type ApiOk<T> = { ok: true; data: T };
 type ApiErr = {
   ok: false;
@@ -12,8 +14,32 @@ export function getUserSafeErrorMessage(args?: {
   const code = String(args?.code ?? "").toUpperCase();
   const status = Number(args?.status ?? 0);
 
+  if (code === "GOOGLE_TOKEN_REJECTED") {
+    return "Unable to sign in right now. Please try again shortly.";
+  }
+
+  if (code === "GOOGLE_INVALID_PAYLOAD") {
+    return "Unable to sign in right now. Please try again shortly.";
+  }
+
+  if (code === "GOOGLE_AUTH_FAILED") {
+    return "Unable to sign in right now. Please try again shortly.";
+  }
+
+  if (code === "SMS_DISABLED") {
+    return "Unable to send the verification code right now. Please try again shortly.";
+  }
+
+  if (code === "SMS_DELIVERY_FAILED") {
+    return "Unable to send the verification code right now. Please try again shortly.";
+  }
+
   if (code === "EMAIL_NOT_VERIFIED") {
     return "Please verify your email address before signing in.";
+  }
+
+  if (code === "PASSWORD_CHANGE_REQUIRED") {
+    return "Your temporary password must be changed before you can continue.";
   }
 
   if (
@@ -102,20 +128,17 @@ export const baseUrl = normalizeApiBaseUrl(
   process.env.NEXT_PUBLIC_API_BASE_URL,
 );
 
-const TOKEN_KEY = "tl_access_token";
+const LEGACY_TOKEN_KEY = "tl_access_token";
+let accessToken: string | null = null;
+let refreshInFlight: Promise<{ token: string | null; status: number }> | null =
+  null;
 
-let accessToken: string | null =
-  typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_KEY) : null;
+if (typeof window !== "undefined") {
+  window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+}
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
-  if (typeof window !== "undefined") {
-    if (token) {
-      window.localStorage.setItem(TOKEN_KEY, token);
-    } else {
-      window.localStorage.removeItem(TOKEN_KEY);
-    }
-  }
 }
 
 export function getAccessToken() {
@@ -143,11 +166,37 @@ function redirectToLogin() {
   window.location.replace("/auth/login");
 }
 
-async function parseApiResponse<T>(res: Response): Promise<ApiResponse<T>> {
+function getRequestIdFromDetails(details: unknown) {
+  if (
+    details &&
+    typeof details === "object" &&
+    "requestId" in details &&
+    typeof details.requestId === "string"
+  ) {
+    return details.requestId;
+  }
+
+  return null;
+}
+
+async function parseApiResponse<T>(
+  res: Response,
+  meta: { path: string; method?: string },
+): Promise<ApiResponse<T>> {
   const contentType = (res.headers.get("content-type") || "").toLowerCase();
   if (contentType.includes("application/json")) {
     const parsed = (await res.json()) as ApiResponse<T>;
     if (parsed.ok) return parsed;
+
+    captureFrontendApiError({
+      path: meta.path,
+      method: meta.method,
+      status: res.status,
+      code: parsed.error.code,
+      requestId: getRequestIdFromDetails(parsed.error.details),
+      message: parsed.error.message,
+    });
+
     return {
       ok: false,
       error: {
@@ -174,14 +223,20 @@ async function parseApiResponse<T>(res: Response): Promise<ApiResponse<T>> {
   };
 }
 
-async function refreshAccessToken(): Promise<{ token: string | null; status: number }> {
+async function refreshAccessToken(): Promise<{
+  token: string | null;
+  status: number;
+}> {
   try {
     const res = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
       method: "POST",
       credentials: "include",
     });
 
-    const json = await parseApiResponse<{ accessToken: string }>(res);
+    const json = await parseApiResponse<{ accessToken: string }>(res, {
+      path: "/api/v1/auth/refresh",
+      method: "POST",
+    });
     if (!json.ok) return { token: null, status: res.status };
     return { token: json.data.accessToken, status: 200 };
   } catch {
@@ -189,12 +244,37 @@ async function refreshAccessToken(): Promise<{ token: string | null; status: num
   }
 }
 
+export async function ensureAccessToken(args?: { forceRefresh?: boolean }) {
+  if (!args?.forceRefresh && accessToken) {
+    return { token: accessToken, status: 200 };
+  }
+
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    const refreshed = await refreshAccessToken();
+    if (refreshed.token) {
+      setAccessToken(refreshed.token);
+    } else if (refreshed.status === 401 || refreshed.status === 403) {
+      setAccessToken(null);
+    }
+    return refreshed;
+  })();
+
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
-  init?: RequestInit & { orgId?: string },
+  init?: RequestInit & { orgId?: string; skipAuthRefresh?: boolean },
 ): Promise<ApiResponse<T>> {
   const headers = new Headers(init?.headers || {});
   headers.set("Content-Type", "application/json");
+  const skipAuthRefresh = Boolean(init?.skipAuthRefresh);
 
   const orgId = init?.orgId ?? getActiveOrgId();
   if (orgId) headers.set("x-org-id", orgId);
@@ -202,12 +282,11 @@ export async function apiFetch<T>(
   const authPath = isAuthPath(path);
   let token = getAccessToken();
 
-  if (!token && !authPath) {
-    const { token: refreshed, status } = await refreshAccessToken();
-    if (refreshed) {
-      setAccessToken(refreshed);
-      token = refreshed;
-    } else if (status === 401 || status === 403) {
+  if (!token && !authPath && !skipAuthRefresh) {
+    const refreshed = await ensureAccessToken();
+    if (refreshed.token) {
+      token = refreshed.token;
+    } else if (refreshed.status === 401 || refreshed.status === 403) {
       if (typeof window !== "undefined") {
         setAccessToken(null);
         redirectToLogin();
@@ -233,9 +312,9 @@ export async function apiFetch<T>(
       credentials: "include",
     });
 
-    if (res.status === 401 && !authPath) {
+    if (res.status === 401 && !authPath && !skipAuthRefresh) {
       const { token: newToken, status: refreshStatus } =
-        await refreshAccessToken();
+        await ensureAccessToken({ forceRefresh: true });
       if (!newToken) {
         if (
           (refreshStatus === 401 || refreshStatus === 403) &&
@@ -246,7 +325,10 @@ export async function apiFetch<T>(
           window.localStorage.removeItem("tl_user_profile");
           redirectToLogin();
         }
-        return parseApiResponse<T>(res);
+        return parseApiResponse<T>(res, {
+          path: cleanPath,
+          method: init?.method,
+        });
       }
 
       setAccessToken(newToken);
@@ -257,11 +339,24 @@ export async function apiFetch<T>(
         headers,
         credentials: "include",
       });
-      return parseApiResponse<T>(retryRes);
+      return parseApiResponse<T>(retryRes, {
+        path: cleanPath,
+        method: init?.method,
+      });
     }
 
-    return parseApiResponse<T>(res);
+    return parseApiResponse<T>(res, {
+      path: cleanPath,
+      method: init?.method,
+    });
   } catch {
+    captureFrontendApiError({
+      path: cleanPath,
+      method: init?.method,
+      code: "FETCH_FAILED",
+      message: `Network request failed for ${cleanPath}`,
+    });
+
     return {
       ok: false,
       error: {
@@ -289,11 +384,10 @@ export async function apiUploadFile<T>(
   let token = getAccessToken();
 
   if (!token && !authPath) {
-    const { token: refreshed, status } = await refreshAccessToken();
-    if (refreshed) {
-      setAccessToken(refreshed);
-      token = refreshed;
-    } else if (status === 401 || status === 403) {
+    const refreshed = await ensureAccessToken();
+    if (refreshed.token) {
+      token = refreshed.token;
+    } else if (refreshed.status === 401 || refreshed.status === 403) {
       if (typeof window !== "undefined") {
         setAccessToken(null);
         redirectToLogin();
@@ -322,7 +416,7 @@ export async function apiUploadFile<T>(
 
     if (res.status === 401 && !authPath) {
       const { token: newToken, status: refreshStatus } =
-        await refreshAccessToken();
+        await ensureAccessToken({ forceRefresh: true });
       if (!newToken) {
         if (
           (refreshStatus === 401 || refreshStatus === 403) &&
@@ -333,7 +427,10 @@ export async function apiUploadFile<T>(
           window.localStorage.removeItem("tl_user_profile");
           redirectToLogin();
         }
-        return parseApiResponse<T>(res);
+        return parseApiResponse<T>(res, {
+          path: cleanPath,
+          method: "POST",
+        });
       }
 
       setAccessToken(newToken);
@@ -345,11 +442,24 @@ export async function apiUploadFile<T>(
         headers,
         credentials: "include",
       });
-      return parseApiResponse<T>(retryRes);
+      return parseApiResponse<T>(retryRes, {
+        path: cleanPath,
+        method: "POST",
+      });
     }
 
-    return parseApiResponse<T>(res);
+    return parseApiResponse<T>(res, {
+      path: cleanPath,
+      method: "POST",
+    });
   } catch {
+    captureFrontendApiError({
+      path: cleanPath,
+      method: "POST",
+      code: "UPLOAD_FAILED",
+      message: `File upload failed for ${cleanPath}`,
+    });
+
     return {
       ok: false,
       error: {

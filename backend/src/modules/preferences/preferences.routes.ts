@@ -19,7 +19,7 @@ preferencesRouter.get(
         orgId: req.orgId!,
         userId: req.auth!.userId,
       })
-      const whatsappCost = env.COST_WHATSAPP_NOTIFICATION || 0
+      const whatsappCost = env.COST_SMS_NOTIFICATION || 0
       res.json(ok({ prefs, whatsappCost }))
     } catch (e) {
       next(e)

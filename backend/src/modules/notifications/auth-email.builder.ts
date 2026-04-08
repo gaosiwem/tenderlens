@@ -47,3 +47,28 @@ export function buildPasswordResetContent(args: {
     html,
   }
 }
+
+export function buildInviteTemporaryPasswordContent(args: {
+  orgName: string
+  loginUrl: string
+  temporaryPassword: string
+}) {
+  const { text, html } = buildBrandedEmailLayout({
+    title: "Invitation accepted",
+    subtitle:
+      "Your TenderLens invitation has been accepted. Use the temporary password below to sign in, then set a new password immediately.",
+    details: [
+      { label: "Organization", value: args.orgName },
+      { label: "Temporary password", value: args.temporaryPassword },
+      { label: "Account URL", value: env.FRONTEND_URL },
+    ],
+    ctaLabel: "Sign in",
+    ctaUrl: args.loginUrl,
+  })
+
+  return {
+    subject: "Your TenderLens temporary password",
+    text,
+    html,
+  }
+}

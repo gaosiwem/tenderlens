@@ -2,9 +2,6 @@
   plan          PlanType @default(FREE)
   status        SubscriptionStatus @default(TRIALING)
 
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-
   seatsPurchased Int @default(1)
   seatsUsed      Int @default(0)
 
@@ -43,7 +40,6 @@ model BillingEvent {
 model OrgInvoice {
   id               String   @id @default(uuid())
   orgId            String
-  stripeInvoiceId  String   @unique
   status           String?
   amountDue        Int?
   amountPaid       Int?
@@ -272,9 +268,9 @@ model ReferralAttribution {
   orgId     String
   referralCodeId String?
   code      String?
-  stripeCheckoutSessionId String?
-  stripeCustomerId String?
-  stripeSubscriptionId String?
+  checkoutReference String?
+  customerReference String?
+  billingReference String?
   createdAt DateTime @default(now())
 
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
