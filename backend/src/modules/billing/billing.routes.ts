@@ -228,6 +228,35 @@ billingRouter.post(
       const frontendOrigin = resolveFrontendOrigin(req)
 
       if (env.PAYFAST_SANDBOX && env.NODE_ENV !== "production") {
+        await trackBillingEvent({
+          orgId: req.orgId!,
+          userId: req.auth!.userId,
+          name: "checkout_started",
+          meta: {
+            plan,
+            quantity,
+            gateway: "PAYFAST",
+            reference,
+            amountCents,
+            mode: "sandbox_local",
+          },
+        })
+
+        await auditLog({
+          req,
+          action: "BILLING_CHECKOUT_STARTED",
+          orgId: req.orgId!,
+          userId: req.auth!.userId,
+          entityType: "OrgSubscription",
+          entityId: req.orgId!,
+          meta: {
+            plan,
+            gateway: "PAYFAST_SANDBOX_LOCAL",
+            reference,
+            amountCents,
+          },
+        })
+
         res.json(
           ok({
             gateway: "PAYFAST_SANDBOX_LOCAL",

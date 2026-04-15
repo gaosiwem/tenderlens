@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch, setAccessToken } from "./api";
+import { apiFetch, getActiveOrgId, setAccessToken, setActiveOrgId } from "./api";
 import type { MeResponse } from "./types";
 
 type AuthState = {
@@ -35,15 +35,6 @@ function getAuthUiMessage(error: { code: string; message: string }) {
     return "Unable to sign in right now. Please try again shortly.";
   }
   return error.message;
-}
-
-function getActiveOrgId(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("tl_active_org_id");
-}
-
-function setActiveOrgId(orgId: string) {
-  window.localStorage.setItem("tl_active_org_id", orgId);
 }
 
 const PROFILE_KEY = "tl_user_profile";
@@ -105,9 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (myOrgIds.length > 0) {
         setActiveOrgId(myOrgIds[0]);
       } else {
-        if (typeof window !== "undefined") {
-          window.localStorage.removeItem("tl_active_org_id");
-        }
+        setActiveOrgId(null);
       }
     } else if (!current && myOrgIds.length > 0) {
       setActiveOrgId(myOrgIds[0]);
@@ -178,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await apiFetch("/api/v1/auth/logout", { method: "POST" });
     setAccessToken(null);
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem("tl_active_org_id");
+      setActiveOrgId(null);
       window.localStorage.removeItem(PROFILE_KEY);
     }
     setState({ isReady: true, isAuthed: false, me: null });

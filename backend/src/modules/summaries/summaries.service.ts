@@ -4,6 +4,9 @@ import { env } from "../../config/env"
 import { AppError } from "../../utils/responses"
 import { logger } from "../../utils/logger"
 import { CacheService } from "../../utils/cache"
+import { primeTenderExtractsForAi } from "../chat/chat.service"
+import { getOrRefreshDeadlines } from "../deadlines/deadlines.service"
+import { ORG_PROFILE_TENDER_SOURCE } from "../orgDocs/orgDocs.constants"
 
 type AIProvider = "openai" | "gemini"
 const SUMMARY_MAX_TOTAL_EXTRACT_CHARS = 32000
@@ -47,14 +50,12 @@ function normalizeSummaryMeta(meta: unknown) {
   return { ...(meta as Record<string, unknown>) }
 }
 
-function buildExtractScope(args: {
-  globalTender: boolean
-  orgId: string
-  tenderId: string
-}) {
-  return args.globalTender
-    ? { tenderId: args.tenderId }
-    : { orgId: args.orgId, tenderId: args.tenderId }
+function buildExtractScope(args: { tenderId: string }) {
+  return { tenderId: args.tenderId }
+}
+
+function buildSummaryScope(args: { tenderId: string }) {
+  return { tenderId: args.tenderId }
 }
 
 function normalizeExtractText(text: string | null | undefined) {
@@ -181,11 +182,66 @@ function hasCredentials(provider: AIProvider) {
     : Boolean(env.OPENAI_API_KEY)
 }
 
-export async function getTenderSummary(orgId: string, tenderId: string) {
-  const summary = await (prisma as any).tenderSummary.findFirst({
-    where: { orgId, tenderId },
-    orderBy: { createdAt: "desc" },
+async function loadTenderSummaryRecord(args: {
+  tenderId: string
+}) {
+  return (prisma as any).tenderSummary.findFirst({
+    where: buildSummaryScope(args),
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   })
+}
+
+function withSummaryMeta(args: {
+  summary: any
+  orgId: string
+  latestExtractAt: Date | null
+}) {
+  const summaryGeneratedAt = new Date(
+    args.summary.updatedAt ?? args.summary.createdAt,
+  )
+  const latestExtractAt = args.latestExtractAt
+  const isStale = Boolean(
+    latestExtractAt && latestExtractAt.getTime() > summaryGeneratedAt.getTime(),
+  )
+  const meta = normalizeSummaryMeta(args.summary.meta)
+
+  return {
+    ...args.summary,
+    orgId: args.orgId,
+    meta: {
+      ...meta,
+      latestExtractCreatedAt: latestExtractAt
+        ? latestExtractAt.toISOString()
+        : null,
+      summaryCreatedAt: summaryGeneratedAt.toISOString(),
+      isStale,
+    },
+  }
+}
+
+export async function getTenderSummary(orgId: string, tenderId: string) {
+  const tender = await prisma.tender.findFirst({
+    where: {
+      id: tenderId,
+      OR: [
+        {
+          orgId: null,
+          source: { not: ORG_PROFILE_TENDER_SOURCE },
+        },
+        {
+          orgId,
+          source: ORG_PROFILE_TENDER_SOURCE,
+        },
+      ],
+    },
+    select: { orgId: true },
+  })
+
+  const summary = tender
+    ? await loadTenderSummaryRecord({
+        tenderId,
+      })
+    : null
 
   if (!summary) {
     const cached = await CacheService.get<any>(CacheService.getAiKey(tenderId, "summary"))
@@ -200,45 +256,36 @@ export async function getTenderSummary(orgId: string, tenderId: string) {
     return null
   }
 
-  const tender = await prisma.tender.findFirst({
-    where: { id: tenderId, OR: [{ orgId }, { orgId: null }] },
-    select: { orgId: true },
-  })
   if (!tender) return summary
 
   const latestExtract = await prisma.tenderExtract.findFirst({
-    where: buildExtractScope({
-      globalTender: tender.orgId == null,
-      orgId,
-      tenderId,
-    }),
+    where: buildExtractScope({ tenderId }),
     orderBy: { createdAt: "desc" },
     select: { createdAt: true },
   })
 
-  const summaryCreatedAt = new Date(summary.createdAt)
-  const latestExtractAt = latestExtract?.createdAt ?? null
-  const isStale = Boolean(
-    latestExtractAt && latestExtractAt.getTime() > summaryCreatedAt.getTime(),
-  )
-
-  const meta = normalizeSummaryMeta(summary.meta)
-  return {
-    ...summary,
-    meta: {
-      ...meta,
-      latestExtractCreatedAt: latestExtractAt
-        ? latestExtractAt.toISOString()
-        : null,
-      summaryCreatedAt: summaryCreatedAt.toISOString(),
-      isStale,
-    },
-  }
+  return withSummaryMeta({
+    summary,
+    orgId,
+    latestExtractAt: latestExtract?.createdAt ?? null,
+  })
 }
 
 export async function generateTenderSummary(orgId: string, tenderId: string) {
   const tender = await prisma.tender.findFirst({
-    where: { id: tenderId, OR: [{ orgId }, { orgId: null }] },
+    where: {
+      id: tenderId,
+      OR: [
+        {
+          orgId: null,
+          source: { not: ORG_PROFILE_TENDER_SOURCE },
+        },
+        {
+          orgId,
+          source: ORG_PROFILE_TENDER_SOURCE,
+        },
+      ],
+    },
     select: {
       id: true,
       orgId: true,
@@ -257,8 +304,50 @@ export async function generateTenderSummary(orgId: string, tenderId: string) {
 
   if (!tender) throw new AppError("NOT_FOUND", "Tender not found", 404)
 
-  const globalTender = tender.orgId == null
-  const extractScope = buildExtractScope({ globalTender, orgId, tenderId })
+  await primeTenderExtractsForAi({
+    orgId,
+    tenderId,
+    includeExternalDocs: true,
+    question: tender.title ?? undefined,
+  })
+
+  try {
+    await getOrRefreshDeadlines({ orgId, tenderId })
+  } catch (error) {
+    logger.warn(
+      { err: error, tenderId, orgId },
+      "summary_deadline_refresh_failed",
+    )
+  }
+
+  const extractScope = buildExtractScope({ tenderId })
+
+  const latestExtract = await prisma.tenderExtract.findFirst({
+    where: extractScope,
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  })
+
+  const existingSummary = await loadTenderSummaryRecord({
+    tenderId,
+  })
+
+  if (existingSummary) {
+    const latestExtractAt = latestExtract?.createdAt ?? null
+    const existingGeneratedAt = new Date(
+      existingSummary.updatedAt ?? existingSummary.createdAt,
+    )
+    if (
+      !latestExtractAt ||
+      existingGeneratedAt.getTime() >= latestExtractAt.getTime()
+    ) {
+      return withSummaryMeta({
+        summary: existingSummary,
+        orgId,
+        latestExtractAt,
+      })
+    }
+  }
 
   const [extractRows, insights] = await Promise.all([
     prisma.tenderExtract.findMany({
@@ -461,22 +550,39 @@ export async function generateTenderSummary(orgId: string, tenderId: string) {
         )
   }
 
-  const saved = await (prisma as any).tenderSummary.create({
-    data: {
-      orgId,
-      tenderId,
-      content,
-      meta: {
-        coverage: extractBundle.coverage,
-        latestExtractCreatedAt: extractBundle.coverage.latestExtractCreatedAt,
-        summaryCreatedAt: new Date().toISOString(),
-        isStale: false,
-      },
-    },
-  })
+  const saved = existingSummary
+    ? await (prisma as any).tenderSummary.update({
+        where: { id: existingSummary.id },
+        data: {
+          content,
+          meta: {
+            coverage: extractBundle.coverage,
+            latestExtractCreatedAt: extractBundle.coverage.latestExtractCreatedAt,
+            summaryCreatedAt: new Date().toISOString(),
+            isStale: false,
+          },
+        },
+      })
+    : await (prisma as any).tenderSummary.create({
+        data: {
+          orgId,
+          tenderId,
+          content,
+          meta: {
+            coverage: extractBundle.coverage,
+            latestExtractCreatedAt: extractBundle.coverage.latestExtractCreatedAt,
+            summaryCreatedAt: new Date().toISOString(),
+            isStale: false,
+          },
+        },
+      })
 
   // Cache globally for other organizations
   await CacheService.set(CacheService.getAiKey(tenderId, "summary"), saved)
 
-  return saved
+  return withSummaryMeta({
+    summary: saved,
+    orgId,
+    latestExtractAt: latestExtract?.createdAt ?? null,
+  })
 }

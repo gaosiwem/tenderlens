@@ -6,6 +6,7 @@ import { ok, AppError } from "../../utils/responses"
 import { prisma } from "../../db/prisma"
 import { env } from "../../config/env"
 import { embedQuery } from "../embeddings/embeddings"
+import { ORG_PROFILE_TENDER_SOURCE } from "../orgDocs/orgDocs.constants"
 
 export const searchRouter = Router()
 
@@ -23,8 +24,6 @@ searchRouter.get(
         25,
         Number(req.query.limit ?? env.SEARCH_LIMIT_DEFAULT),
       )
-      const orgId = req.orgId!
-
       const v = await embedQuery(q)
       if (!v.length) {
         return res.json(ok({ items: [], note: "Embeddings disabled" }))
@@ -42,13 +41,15 @@ searchRouter.get(
         c.content,
         1 - (c.embedding <=> $1::vector) AS score
       FROM "TenderChunk" c
-      WHERE c."orgId" = $2
+      INNER JOIN "Tender" t ON t."id" = c."tenderId"
+      WHERE t."orgId" IS NULL
+        AND t."source" IS DISTINCT FROM $2
         AND c.embedding IS NOT NULL
       ORDER BY c.embedding <=> $1::vector ASC
       LIMIT $3
       `,
         `[${v.join(",")}]`,
-        orgId,
+        ORG_PROFILE_TENDER_SOURCE,
         limit,
       )
 

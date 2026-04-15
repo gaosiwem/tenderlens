@@ -14,6 +14,7 @@ import { ensureOrgBillingPolicy } from "../billing/policy.service"
 import { logger } from "../../utils/logger"
 import { chunkText, normalizeText } from "../text/chunker"
 import { JobStatus, Prisma, TenderStatus } from "@prisma/client"
+import { ORG_PROFILE_TENDER_SOURCE } from "../orgDocs/orgDocs.constants"
 import { storage } from "../storage/storage"
 import { sha256 } from "../../utils/hash"
 import crypto from "crypto"
@@ -224,6 +225,14 @@ type ExternalHydrationSummary = {
   totalDocs: number
   importedDocs: number
   failedDocs: number
+}
+
+type TenderStorageScope = {
+  global: boolean
+  fileWhere: Prisma.TenderFileWhereInput
+  extractWhere: Prisma.TenderExtractWhereInput
+  chunkWhere: Prisma.TenderChunkWhereInput
+  jobWhere: Prisma.ProcessingJobWhereInput
 }
 
 const GENERATED_TENDER_CONTEXT_FILENAME = "Tender Overview (generated).txt"
@@ -501,7 +510,8 @@ const liveContextProgress = new Map<string, LiveContextProgress>()
 const activeContextPreparation = new Map<string, Promise<void>>()
 
 function contextPreparationKey(orgId: string, tenderId: string) {
-  return `${orgId}:${tenderId}`
+  void orgId
+  return tenderId
 }
 
 function setLiveContextProgress(
@@ -536,20 +546,64 @@ function isContextPreparationActive(orgId: string, tenderId: string) {
   return activeContextPreparation.has(contextPreparationKey(orgId, tenderId))
 }
 
+function buildTenderStorageScope(args: {
+  orgId: string
+  tenderId: string
+  tender: Pick<TenderMetadataSnapshot, "orgId" | "source"> | null
+}): TenderStorageScope {
+  const global =
+    args.tender?.orgId == null &&
+    args.tender?.source !== ORG_PROFILE_TENDER_SOURCE
+
+  return {
+    global,
+    fileWhere: global
+      ? { tenderId: args.tenderId }
+      : { orgId: args.orgId, tenderId: args.tenderId },
+    extractWhere: global
+      ? { tenderId: args.tenderId }
+      : { orgId: args.orgId, tenderId: args.tenderId },
+    chunkWhere: global
+      ? { tenderId: args.tenderId }
+      : { orgId: args.orgId, tenderId: args.tenderId },
+    jobWhere: global
+      ? { tenderId: args.tenderId }
+      : { orgId: args.orgId, tenderId: args.tenderId },
+  }
+}
+
+async function resolveTenderStorageScope(args: {
+  orgId: string
+  tenderId: string
+}) {
+  const tender = await loadTenderMetadataSnapshot(args.tenderId)
+  return buildTenderStorageScope({
+    orgId: args.orgId,
+    tenderId: args.tenderId,
+    tender,
+  })
+}
+
 async function persistExtractAndChunks(args: {
   orgId: string
   tenderId: string
   tenderFileId: string
   text: string
   meta: Record<string, unknown>
+  ownerOrgId?: string
 }) {
   const finalText = normalizeText(args.text)
   if (!finalText) return
 
+  const scope = await resolveTenderStorageScope({
+    orgId: args.orgId,
+    tenderId: args.tenderId,
+  })
+  const persistedOrgId = args.ownerOrgId ?? args.orgId
+
   const hasExtract = await prisma.tenderExtract.findFirst({
     where: {
-      orgId: args.orgId,
-      tenderId: args.tenderId,
+      ...scope.extractWhere,
       tenderFileId: args.tenderFileId,
     },
     select: { id: true },
@@ -558,7 +612,7 @@ async function persistExtractAndChunks(args: {
   if (!hasExtract) {
     await prisma.tenderExtract.create({
       data: {
-        orgId: args.orgId,
+        orgId: persistedOrgId,
         tenderId: args.tenderId,
         tenderFileId: args.tenderFileId,
         text: finalText,
@@ -572,15 +626,14 @@ async function persistExtractAndChunks(args: {
 
   await prisma.tenderChunk.deleteMany({
     where: {
-      orgId: args.orgId,
-      tenderId: args.tenderId,
+      ...scope.chunkWhere,
       tenderFileId: args.tenderFileId,
     },
   })
 
   for (const chunk of chunks) {
     await createChunkSafe({
-      orgId: args.orgId,
+      orgId: persistedOrgId,
       tenderId: args.tenderId,
       tenderFileId: args.tenderFileId,
       index: chunk.index,
@@ -594,9 +647,11 @@ async function ensureChunksFromExtracts(args: {
   orgId: string
   tenderId: string
 }) {
+  const scope = await resolveTenderStorageScope(args)
   const extracts = await prisma.tenderExtract.findMany({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: scope.extractWhere,
     select: {
+      orgId: true,
       tenderFileId: true,
       text: true,
       createdAt: true,
@@ -606,10 +661,14 @@ async function ensureChunksFromExtracts(args: {
   })
   if (extracts.length === 0) return
 
-  const latestByFile = new Map<string, { tenderFileId: string; text: string }>()
+  const latestByFile = new Map<
+    string,
+    { orgId: string; tenderFileId: string; text: string }
+  >()
   for (const ex of extracts) {
     if (!latestByFile.has(ex.tenderFileId)) {
       latestByFile.set(ex.tenderFileId, {
+        orgId: ex.orgId,
         tenderFileId: ex.tenderFileId,
         text: ex.text ?? "",
       })
@@ -619,8 +678,7 @@ async function ensureChunksFromExtracts(args: {
   for (const ex of latestByFile.values()) {
     const existingFileChunks = await prisma.tenderChunk.count({
       where: {
-        orgId: args.orgId,
-        tenderId: args.tenderId,
+        ...scope.chunkWhere,
         tenderFileId: ex.tenderFileId,
       },
     })
@@ -631,7 +689,7 @@ async function ensureChunksFromExtracts(args: {
 
     for (const chunk of chunks) {
       await createChunkSafe({
-        orgId: args.orgId,
+        orgId: ex.orgId,
         tenderId: args.tenderId,
         tenderFileId: ex.tenderFileId,
         index: chunk.index,
@@ -648,8 +706,9 @@ async function ensureChunksFromFiles(args: {
   question?: string
   maxCandidates?: number
 }) {
+  const scope = await resolveTenderStorageScope(args)
   const files = await prisma.tenderFile.findMany({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: scope.fileWhere,
     orderBy: { createdAt: "desc" },
     take: 25,
   })
@@ -659,7 +718,7 @@ async function ensureChunksFromFiles(args: {
   if (files.length === 0) return
 
   const chunkedFileRows = await prisma.tenderChunk.findMany({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: scope.chunkWhere,
     select: { tenderFileId: true },
     distinct: ["tenderFileId"],
     take: 5000,
@@ -732,6 +791,7 @@ async function ensureChunksFromFiles(args: {
         tenderId: args.tenderId,
         tenderFileId: file.id,
         text,
+        ownerOrgId: file.orgId,
         meta: {
           mode: "chat-file-fallback",
           sourceMimeType: file.mimeType,
@@ -773,11 +833,16 @@ async function ensureChunksFromExternalDocs(args: {
 
   const tenderMeta = await loadTenderMetadataSnapshot(args.tenderId)
   if (!tenderMeta?.documents) return summary
+  const scope = buildTenderStorageScope({
+    orgId: args.orgId,
+    tenderId: args.tenderId,
+    tender: tenderMeta,
+  })
 
   const docs = parseExternalDocs(tenderMeta.documents)
   if (docs.length === 0) return summary
   const existingFiles = await prisma.tenderFile.findMany({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: scope.fileWhere,
     select: { originalFilename: true },
     take: 5000,
   })
@@ -935,8 +1000,9 @@ async function ensureGeneratedFallbackContext(args: {
   orgId: string
   tenderId: string
 }) {
+  const scope = await resolveTenderStorageScope(args)
   const existingChunks = await prisma.tenderChunk.count({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: scope.chunkWhere,
   })
   if (existingChunks > 0) return false
 
@@ -972,11 +1038,10 @@ async function ensureGeneratedFallbackContext(args: {
 
   let file = await prisma.tenderFile.findFirst({
     where: {
-      orgId: args.orgId,
-      tenderId: args.tenderId,
+      ...scope.fileWhere,
       originalFilename: GENERATED_TENDER_CONTEXT_FILENAME,
     },
-    select: { id: true },
+    select: { id: true, orgId: true },
   })
 
   if (!file) {
@@ -990,7 +1055,7 @@ async function ensureGeneratedFallbackContext(args: {
         sizeBytes: Buffer.byteLength(text, "utf-8"),
         checksumSha256: sha256(text),
       },
-      select: { id: true },
+      select: { id: true, orgId: true },
     })
   }
 
@@ -999,6 +1064,7 @@ async function ensureGeneratedFallbackContext(args: {
     tenderId: args.tenderId,
     tenderFileId: file.id,
     text,
+    ownerOrgId: file.orgId,
     meta: { mode: "chat-generated-fallback" },
   })
 
@@ -1313,8 +1379,9 @@ export async function prepareTenderContextForChat(args: {
 
   let chunkCount = 0
   try {
+    const scope = await resolveTenderStorageScope(args)
     chunkCount = await prisma.tenderChunk.count({
-      where: { orgId: args.orgId, tenderId: args.tenderId },
+      where: scope.chunkWhere,
     })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
@@ -1331,8 +1398,9 @@ export async function prepareTenderContextForChat(args: {
         tenderId: args.tenderId,
       })
       if (generated) {
+        const scope = await resolveTenderStorageScope(args)
         chunkCount = await prisma.tenderChunk.count({
-          where: { orgId: args.orgId, tenderId: args.tenderId },
+          where: scope.chunkWhere,
         })
         if (args.conversationId) {
           setLiveContextProgress({
@@ -1382,6 +1450,79 @@ export async function prepareTenderContextForChat(args: {
   }
 
   return { chunkCount, externalSummary, warnings }
+}
+
+export async function primeTenderExtractsForAi(args: {
+  orgId: string
+  tenderId: string
+  includeExternalDocs?: boolean
+  question?: string
+}) {
+  const warnings: string[] = []
+
+  try {
+    await ensureChunksFromExtracts({
+      orgId: args.orgId,
+      tenderId: args.tenderId,
+    })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.warn(
+      `[ai] ensureChunksFromExtracts failed for tender ${args.tenderId}: ${msg}`,
+    )
+    warnings.push(`extracts:${msg}`)
+  }
+
+  try {
+    await ensureChunksFromFiles({
+      orgId: args.orgId,
+      tenderId: args.tenderId,
+      question: args.question,
+      maxCandidates: CHAT_FILE_INDEX_CANDIDATE_LIMIT,
+    })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.warn(
+      `[ai] ensureChunksFromFiles failed for tender ${args.tenderId}: ${msg}`,
+    )
+    warnings.push(`files:${msg}`)
+  }
+
+  if (args.includeExternalDocs ?? true) {
+    try {
+      await ensureChunksFromExternalDocs({
+        orgId: args.orgId,
+        tenderId: args.tenderId,
+        question: args.question,
+        maxCandidates: CHAT_EXTERNAL_DOC_INDEX_CANDIDATE_LIMIT,
+      })
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      logger.warn(
+        `[ai] ensureChunksFromExternalDocs failed for tender ${args.tenderId}: ${msg}`,
+      )
+      warnings.push(`external:${msg}`)
+    }
+  }
+
+  try {
+    await reconcileTenderStatusForChat({
+      orgId: args.orgId,
+      tenderId: args.tenderId,
+    })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.warn(
+      `[ai] reconcileTenderStatusForChat failed for tender ${args.tenderId}: ${msg}`,
+    )
+    warnings.push(`status:${msg}`)
+  }
+
+  const extractCount = await prisma.tenderExtract.count({
+    where: (await resolveTenderStorageScope(args)).extractWhere,
+  })
+
+  return { extractCount, warnings }
 }
 
 function scheduleTenderContextPreparation(args: {
@@ -1439,6 +1580,7 @@ async function reconcileTenderStatusForChat(args: {
   orgId: string
   tenderId: string
 }) {
+  const scope = await resolveTenderStorageScope(args)
   const tender = await prisma.tender.findFirst({
     where: { id: args.tenderId },
     select: { id: true, status: true },
@@ -1449,15 +1591,14 @@ async function reconcileTenderStatusForChat(args: {
 
   const activeJobs = await prisma.processingJob.count({
     where: {
-      orgId: args.orgId,
-      tenderId: args.tenderId,
+      ...scope.jobWhere,
       status: { in: [JobStatus.QUEUED, JobStatus.PROCESSING] },
     },
   })
   if (activeJobs > 0) return
 
   const chunkCount = await prisma.tenderChunk.count({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: scope.chunkWhere,
   })
   if (chunkCount === 0) return
 
@@ -1654,6 +1795,10 @@ export async function getConversationContextProgress(args: {
   }
 
   const tenderId = convo.tenderId
+  const scope = await resolveTenderStorageScope({
+    orgId: args.orgId,
+    tenderId,
+  })
 
   const [userMessages, files, extractRows, chunkRows, activeJobs, scraped] =
     await Promise.all([
@@ -1665,26 +1810,25 @@ export async function getConversationContextProgress(args: {
         },
       }),
       prisma.tenderFile.findMany({
-        where: { orgId: args.orgId, tenderId },
+        where: scope.fileWhere,
         select: { originalFilename: true },
         take: 5000,
       }),
       prisma.tenderExtract.findMany({
-        where: { orgId: args.orgId, tenderId },
+        where: scope.extractWhere,
         distinct: ["tenderFileId"],
         select: { tenderFileId: true },
         take: 5000,
       }),
       prisma.tenderChunk.findMany({
-        where: { orgId: args.orgId, tenderId },
+        where: scope.chunkWhere,
         distinct: ["tenderFileId"],
         select: { tenderFileId: true },
         take: 5000,
       }),
       prisma.processingJob.count({
         where: {
-          orgId: args.orgId,
-          tenderId,
+          ...scope.jobWhere,
           status: { in: [JobStatus.QUEUED, JobStatus.PROCESSING] },
         },
       }),

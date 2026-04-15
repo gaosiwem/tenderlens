@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { TLEmptyState } from "@/components/tenderlens/empty-state";
 import { useAuth } from "@/lib/auth";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, setActiveOrgId } from "@/lib/api";
 import type { Org } from "@/lib/types";
 
 export default function OrgsPage() {
@@ -51,7 +51,7 @@ export default function OrgsPage() {
         description: res.error.message,
       });
 
-    window.localStorage.setItem("tl_active_org_id", res.data.id);
+    setActiveOrgId(res.data.id);
     toast.success("Organization created", {
       description: "Active org updated.",
     });
@@ -60,7 +60,7 @@ export default function OrgsPage() {
   }
 
   function setActive(orgId: string) {
-    window.localStorage.setItem("tl_active_org_id", orgId);
+    setActiveOrgId(orgId);
     toast.message("Active organization updated");
     auth.refreshMe();
   }

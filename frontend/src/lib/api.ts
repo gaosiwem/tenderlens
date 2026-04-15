@@ -129,6 +129,8 @@ export const baseUrl = normalizeApiBaseUrl(
 );
 
 const LEGACY_TOKEN_KEY = "tl_access_token";
+const ACTIVE_ORG_STORAGE_KEY = "tl_active_org_id";
+const ACTIVE_ORG_EVENT = "tl-active-org-changed";
 let accessToken: string | null = null;
 let refreshInFlight: Promise<{ token: string | null; status: number }> | null =
   null;
@@ -147,7 +149,50 @@ export function getAccessToken() {
 
 export function getActiveOrgId(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("tl_active_org_id");
+  return window.localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
+}
+
+export function setActiveOrgId(orgId: string | null) {
+  if (typeof window === "undefined") return;
+
+  if (orgId) {
+    window.localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, orgId);
+  } else {
+    window.localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(ACTIVE_ORG_EVENT, {
+      detail: { orgId },
+    }),
+  );
+}
+
+export function subscribeToActiveOrgId(
+  callback: (orgId: string | null) => void,
+) {
+  if (typeof window === "undefined") return () => {};
+
+  const handleActiveOrgChange = (event: Event) => {
+    const customEvent = event as CustomEvent<{ orgId?: string | null }>;
+    callback(customEvent.detail?.orgId ?? getActiveOrgId());
+  };
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key !== ACTIVE_ORG_STORAGE_KEY) return;
+    callback(event.newValue);
+  };
+
+  window.addEventListener(ACTIVE_ORG_EVENT, handleActiveOrgChange as EventListener);
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    window.removeEventListener(
+      ACTIVE_ORG_EVENT,
+      handleActiveOrgChange as EventListener,
+    );
+    window.removeEventListener("storage", handleStorage);
+  };
 }
 
 function isAuthPath(path: string) {
@@ -321,7 +366,7 @@ export async function apiFetch<T>(
           typeof window !== "undefined"
         ) {
           setAccessToken(null);
-          window.localStorage.removeItem("tl_active_org_id");
+          setActiveOrgId(null);
           window.localStorage.removeItem("tl_user_profile");
           redirectToLogin();
         }
@@ -423,7 +468,7 @@ export async function apiUploadFile<T>(
           typeof window !== "undefined"
         ) {
           setAccessToken(null);
-          window.localStorage.removeItem("tl_active_org_id");
+          setActiveOrgId(null);
           window.localStorage.removeItem("tl_user_profile");
           redirectToLogin();
         }

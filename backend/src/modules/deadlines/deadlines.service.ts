@@ -6,6 +6,7 @@ import {
 import { emitEvent } from "../notifications/notifications.service"
 import { NotificationType, type Prisma } from "@prisma/client"
 import { AppError } from "../../utils/responses"
+import { ORG_PROFILE_TENDER_SOURCE } from "../orgDocs/orgDocs.constants"
 
 type ContextChunk = {
   id: string
@@ -55,25 +56,28 @@ function splitTextBySize(text: string, size: number) {
 
 async function resolveDeadlineDataScope(args: { orgId: string; tenderId: string }) {
   const tender = await prisma.tender.findFirst({
-    where: { id: args.tenderId, OR: [{ orgId: args.orgId }, { orgId: null }] },
+    where: {
+      id: args.tenderId,
+      OR: [
+        {
+          orgId: null,
+          source: { not: ORG_PROFILE_TENDER_SOURCE },
+        },
+        {
+          orgId: args.orgId,
+          source: ORG_PROFILE_TENDER_SOURCE,
+        },
+      ],
+    },
     select: { orgId: true },
   })
 
   if (!tender) throw new AppError("NOT_FOUND", "Tender not found", 404)
 
-  const isGlobalTender = tender.orgId == null
-  if (isGlobalTender) {
-    return {
-      extractWhere: { tenderId: args.tenderId },
-      chunkWhere: { tenderId: args.tenderId },
-      deadlineWhere: { tenderId: args.tenderId },
-    } satisfies DeadlineDataScope
-  }
-
   return {
-    extractWhere: { orgId: args.orgId, tenderId: args.tenderId },
-    chunkWhere: { orgId: args.orgId, tenderId: args.tenderId },
-    deadlineWhere: { orgId: args.orgId, tenderId: args.tenderId },
+    extractWhere: { tenderId: args.tenderId },
+    chunkWhere: { tenderId: args.tenderId },
+    deadlineWhere: { tenderId: args.tenderId },
   } satisfies DeadlineDataScope
 }
 

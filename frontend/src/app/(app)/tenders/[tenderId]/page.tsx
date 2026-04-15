@@ -392,7 +392,7 @@ export default function TenderDetailPage() {
                   Checklist
                 </TLButton>
               </Link>
-              <Link href={`/tenders/${tender.id}/summary?autogen=1`}>
+              <Link href={`/tenders/${tender.id}/summary`}>
                 <TLButton variant="outline">
                   <FileText className="size-4 mr-2" />
                   Summary

@@ -116,6 +116,15 @@ export default function TenderSummaryPage() {
   const guardRunRef = React.useRef<GuardRun | null>(null);
   const autoGenerationKeyRef = React.useRef<string | null>(null);
 
+  const loadDeadlines = React.useCallback(async () => {
+    const deadlinesRes = await getTenderDeadlines(tenderId);
+    if (deadlinesRes.ok) {
+      setDeadlines(deadlinesRes.data.deadlines);
+    } else {
+      setDeadlines(null);
+    }
+  }, [tenderId]);
+
   const loadSummary = React.useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -175,6 +184,9 @@ export default function TenderSummaryPage() {
   const latestExtractLabel = toLocalDateLabel(
     summary?.meta?.latestExtractCreatedAt ?? null,
   );
+  const summaryGeneratedLabel = toLocalDateLabel(
+    summary?.meta?.summaryCreatedAt ?? summary?.updatedAt ?? summary?.createdAt ?? null,
+  );
   const showGeneratingState = !summary && (generating || forceAutoGenerate);
 
   const generateSummary = React.useCallback(
@@ -186,6 +198,7 @@ export default function TenderSummaryPage() {
         const res = await refreshTenderSummary(tenderId);
         if (!res.ok) throw res.error;
         setSummary(res.data);
+        await loadDeadlines();
         setError(null);
         if (!auto) {
           toast.success("Summary refreshed successfully");
@@ -218,14 +231,18 @@ export default function TenderSummaryPage() {
         setGenerating(false);
       }
     },
-    [generating, router, tenderId],
+    [generating, loadDeadlines, router, tenderId],
   );
 
   React.useEffect(() => {
     if (loading || generating) return;
 
-    const shouldAutoGenerate = forceAutoGenerate || !summary;
-    if (!shouldAutoGenerate) return;
+    if (summary) {
+      if (forceAutoGenerate) {
+        router.replace(`/tenders/${tenderId}/summary`);
+      }
+      return;
+    }
 
     const key = `${tenderId}:${forceAutoGenerate ? "force" : "missing"}`;
     if (autoGenerationKeyRef.current === key) return;
@@ -344,8 +361,7 @@ export default function TenderSummaryPage() {
                       <div className="mx-auto max-w-4xl mt-12 pt-6 border-t border-border/50 text-[11px] font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                         <FileText className="size-3.5" />
                         <span>
-                          Generated on{" "}
-                          {new Date(summary.createdAt).toLocaleString()}
+                          Generated on {summaryGeneratedLabel ?? "Unknown"}
                         </span>
                       </div>
                       {summaryCoverage && summaryCoverage.fileCountIncluded > 0 ? (

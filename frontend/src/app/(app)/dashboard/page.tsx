@@ -29,7 +29,7 @@ import {
 import { TLDashboardOrgSwitchboard } from "@/components/tenderlens/dashboard-org-switchboard";
 import { TLDashboardSignalsCard } from "@/components/tenderlens/dashboard-signals-card";
 import { useAuth } from "@/lib/auth";
-import { getActiveOrgId } from "@/lib/api";
+import { getActiveOrgId, setActiveOrgId as persistActiveOrgId } from "@/lib/api";
 import { useBilling } from "@/hooks/use-billing";
 import { useOnboardingChecklist } from "@/hooks/use-onboarding-checklist";
 import { listNotificationEvents } from "@/lib/notifications.api";
@@ -56,6 +56,7 @@ export default function DashboardPage() {
   const [events, setEvents] = React.useState<NotificationEvent[]>([]);
   const [retentionEvent, setRetentionEvent] =
     React.useState<NotificationEvent | null>(null);
+  const [trialNow, setTrialNow] = React.useState(() => Date.now());
 
   React.useEffect(() => {
     if (!auth.isReady) return;
@@ -94,6 +95,10 @@ export default function DashboardPage() {
     void loadSignals();
   }, [loadSignals, activeOrgId]);
 
+  React.useEffect(() => {
+    setTrialNow(Date.now());
+  }, [subscription?.trialEndsAt]);
+
   if (!auth.isReady) {
     return (
       <TenderLensAppShell title="Operations Desk" subtitle="Dashboard">
@@ -119,7 +124,7 @@ export default function DashboardPage() {
       ? Math.max(
           0,
           Math.ceil(
-            (new Date(subscription.trialEndsAt).getTime() - Date.now()) /
+            (new Date(subscription.trialEndsAt).getTime() - trialNow) /
               (1000 * 60 * 60 * 24),
           ),
         )
@@ -206,7 +211,7 @@ export default function DashboardPage() {
     if (typeof window === "undefined") return;
     if (orgId === activeOrgId) return;
 
-    window.localStorage.setItem("tl_active_org_id", orgId);
+    persistActiveOrgId(orgId);
     setActiveOrgId(orgId);
     await Promise.all([
       reloadBilling(),

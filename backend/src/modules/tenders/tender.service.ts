@@ -587,8 +587,10 @@ function hasTitleOverlap(a: string, b: string) {
 }
 
 function accessibleTenderWhere(orgId: string): Prisma.TenderWhereInput {
+  void orgId
   return {
-    OR: [{ orgId }, { orgId: null }],
+    orgId: null,
+    source: { not: ORG_PROFILE_TENDER_SOURCE },
   }
 }
 
@@ -1158,10 +1160,7 @@ export async function listTenders(args: {
     !includeHistorical && hideClosedTenders && lifecycle === "open"
   const applyRetentionFilter = !includeHistorical && retentionCutoff !== null
   const orgScopeFilter = Prisma.sql`
-    AND (
-      t."orgId" = ${args.orgId}
-      OR t."orgId" IS NULL
-    )
+    AND t."orgId" IS NULL
   `
 
   let rows: ListTenderRow[]
@@ -1593,12 +1592,23 @@ export async function getTender(args: {
   tenderId: string
 }) {
   const t = await prisma.tender.findFirst({
-    where: args.orgId
-      ? {
-          id: args.tenderId,
-          OR: [{ orgId: args.orgId }, { orgId: null }],
-        }
-      : { id: args.tenderId },
+    where: {
+      id: args.tenderId,
+      OR: [
+        {
+          orgId: null,
+          source: { not: ORG_PROFILE_TENDER_SOURCE },
+        },
+        ...(args.orgId
+          ? [
+              {
+                orgId: args.orgId,
+                source: ORG_PROFILE_TENDER_SOURCE,
+              },
+            ]
+          : []),
+      ],
+    },
   })
   if (!t) throw new AppError("NOT_FOUND", "Tender not found", 404)
   return t

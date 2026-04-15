@@ -229,15 +229,16 @@ async function loadTenderContext(args: {
   tenderId: string
   fallbackTitle: string
 }) {
+  void args.orgId
   const extract = await prisma.tenderExtract.findFirst({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: { tenderId: args.tenderId },
     orderBy: { createdAt: "desc" },
     select: { text: true },
   })
   if (extract?.text?.trim()) return extract.text
 
   const chunks = await prisma.tenderChunk.findMany({
-    where: { orgId: args.orgId, tenderId: args.tenderId },
+    where: { tenderId: args.tenderId },
     orderBy: { createdAt: "desc" },
     take: 20,
     select: { content: true },
@@ -271,14 +272,16 @@ export async function compareTenders(args: {
     prisma.tender.findFirst({
       where: {
         id: args.tenderAId,
-        OR: [{ orgId: args.orgId }, { orgId: null }],
+        orgId: null,
+        source: { not: ORG_PROFILE_TENDER_SOURCE },
       },
       include: { deadlines: true },
     }),
     prisma.tender.findFirst({
       where: {
         id: args.tenderBId,
-        OR: [{ orgId: args.orgId }, { orgId: null }],
+        orgId: null,
+        source: { not: ORG_PROFILE_TENDER_SOURCE },
       },
       include: { deadlines: true },
     }),
@@ -390,7 +393,8 @@ export async function generateBidChecklist(args: {
   const tender = await prisma.tender.findFirst({
     where: {
       id: args.tenderId,
-      OR: [{ orgId: args.orgId }, { orgId: null }],
+      orgId: null,
+      source: { not: ORG_PROFILE_TENDER_SOURCE },
     },
     include: { deadlines: true },
   })
