@@ -1,0 +1,89 @@
+services:
+  # Redis for queues/workers
+  redis:
+    image: redis:7
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Supabase Postgres + Supabase Storage)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=${SUPABASE_DATABASE_URL:?Set SUPABASE_DATABASE_URL}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - NODE_ENV=${NODE_ENV:-production}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - STORAGE_DRIVER=supabase
+      - SUPABASE_S3_ENDPOINT=${SUPABASE_S3_ENDPOINT:?Set SUPABASE_S3_ENDPOINT}
+      - SUPABASE_S3_BUCKET=${SUPABASE_S3_BUCKET:?Set SUPABASE_S3_BUCKET}
+      - SUPABASE_S3_ACCESS_KEY_ID=${SUPABASE_S3_ACCESS_KEY_ID:?Set SUPABASE_S3_ACCESS_KEY_ID}
+      - SUPABASE_S3_SECRET_ACCESS_KEY=${SUPABASE_S3_SECRET_ACCESS_KEY:?Set SUPABASE_S3_SECRET_ACCESS_KEY}
+      - SUPABASE_S3_REGION=${SUPABASE_S3_REGION:-auto}
+      - SUPABASE_S3_FORCE_PATH_STYLE=${SUPABASE_S3_FORCE_PATH_STYLE:-true}
+      - EMAIL_VERIFICATION_REQUIRED=${EMAIL_VERIFICATION_REQUIRED:-true}
+    expose:
+      - "8080"
+    volumes:
+      - tenderlens_storage:/app/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  # Background Worker
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["npm", "run", "worker:start"]
+    environment:
+      - DATABASE_URL=${SUPABASE_DATABASE_URL:?Set SUPABASE_DATABASE_URL}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - NODE_ENV=${NODE_ENV:-production}
+      - STORAGE_DRIVER=supabase
+      - SUPABASE_S3_ENDPOINT=${SUPABASE_S3_ENDPOINT:?Set SUPABASE_S3_ENDPOINT}
+      - SUPABASE_S3_BUCKET=${SUPABASE_S3_BUCKET:?Set SUPABASE_S3_BUCKET}
+      - SUPABASE_S3_ACCESS_KEY_ID=${SUPABASE_S3_ACCESS_KEY_ID:?Set SUPABASE_S3_ACCESS_KEY_ID}
+      - SUPABASE_S3_SECRET_ACCESS_KEY=${SUPABASE_S3_SECRET_ACCESS_KEY:?Set SUPABASE_S3_SECRET_ACCESS_KEY}
+      - SUPABASE_S3_REGION=${SUPABASE_S3_REGION:-auto}
+      - SUPABASE_S3_FORCE_PATH_STYLE=${SUPABASE_S3_FORCE_PATH_STYLE:-true}
+    volumes:
+      - tenderlens_storage:/app/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?Set NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:?Set NEXT_PUBLIC_API_BASE_URL}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+    expose:
+      - "3005"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  tenderlens_storage:
