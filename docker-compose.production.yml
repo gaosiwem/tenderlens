@@ -6,8 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-TenderLens}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-@TenderLens10111}
       POSTGRES_DB: ${POSTGRES_DB:-tenderlens}
-    ports:
-      - "${DB_PORT:-5432}:5432"
+    expose:
+      - "5432"
     volumes:
       - tenderlens_pg:/var/lib/postgresql/data
     healthcheck:
@@ -23,8 +23,8 @@ services:
   # Redis for BullMQ
   redis:
     image: redis:7
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    expose:
+      - "6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -41,7 +41,7 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:D0_7gm2nM5zQ1v9L1tRmYwPaUxB6cJqZde8fHY3kS@host.docker.internal:5433/postgres}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:-production}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-supabase}
@@ -52,8 +52,8 @@ services:
       - SUPABASE_S3_REGION=${SUPABASE_S3_REGION:-auto}
       - SUPABASE_S3_FORCE_PATH_STYLE=${SUPABASE_S3_FORCE_PATH_STYLE:-true}
       - EMAIL_VERIFICATION_REQUIRED=${EMAIL_VERIFICATION_REQUIRED:-true}
-    ports:
-      - "${API_PORT:-8080}:8080"
+    expose:
+      - "8080"
     volumes:
       - tenderlens_storage:/app/storage
     extra_hosts:
@@ -74,7 +74,7 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:D0_7gm2nM5zQ1v9L1tRmYwPaUxB6cJqZde8fHY3kS@host.docker.internal:5433/postgres}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:-production}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-supabase}
       - SUPABASE_S3_ENDPOINT=${SUPABASE_S3_ENDPOINT:-http://host.docker.internal:8000/storage/v1/s3}
       - SUPABASE_S3_BUCKET=${SUPABASE_S3_BUCKET:-tenderlens}
@@ -104,8 +104,8 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
-    ports:
-      - "${FRONTEND_PORT:-3005}:3005"
+    expose:
+      - "3005"
     depends_on:
       - backend
     restart: always
@@ -113,3 +113,4 @@ services:
 volumes:
   tenderlens_pg:
   tenderlens_storage:
+
