@@ -11,7 +11,7 @@ export class CacheService {
       if (!data) return null
       return JSON.parse(data) as T
     } catch (error) {
-      logger.error(`[cache] Error getting key ${key}:`, error)
+      logger.error({ err: error, key }, "[cache] Error getting key")
       return null
     }
   }
@@ -25,7 +25,7 @@ export class CacheService {
       const data = JSON.stringify(value)
       await redis.set(key, data, "EX", ttlSeconds)
     } catch (error) {
-      logger.error(`[cache] Error setting key ${key}:`, error)
+      logger.error({ err: error, key }, "[cache] Error setting key")
     }
   }
 
@@ -36,7 +36,7 @@ export class CacheService {
     try {
       await redis.del(key)
     } catch (error) {
-      logger.error(`[cache] Error deleting key ${key}:`, error)
+      logger.error({ err: error, key }, "[cache] Error deleting key")
     }
   }
 

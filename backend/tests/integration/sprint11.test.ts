@@ -24,13 +24,6 @@ vi.mock("ioredis", () => {
   }
 })
 
-// stub out real Twilio calls
-vi.mock("../../src/modules/notifications/whatsapp.sender", () => ({
-  sendWhatsApp: vi.fn().mockResolvedValue(undefined),
-}))
-
-import { sendWhatsApp as sendWhatsAppMock } from "../../src/modules/notifications/whatsapp.sender"
-
 const app = createApp()
 
 describe("Sprint 11: Team Collaboration & Governance", () => {

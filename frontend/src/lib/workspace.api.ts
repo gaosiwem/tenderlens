@@ -7,13 +7,18 @@ import type {
   BidWorkspace,
 } from "./workspace.types";
 
-type WorkspaceTaskCommentApi = BidTaskComment & { body?: string };
-
+type WorkspaceTaskCommentApi = Omit<BidTaskComment, "content"> & {
+  content?: string;
+  body?: string;
+};
 type WorkspaceTaskApi = Omit<BidTask, "comments"> & {
   comments?: WorkspaceTaskCommentApi[];
 };
 
-type WorkspaceFullApiResponse = BidWorkspace & {
+type WorkspaceFullApiResponse = Omit<
+  BidWorkspace,
+  "tasks" | "activities" | "attachments"
+> & {
   tasks?: WorkspaceTaskApi[];
   activities?: BidActivity[];
   attachments?: BidAttachment[];

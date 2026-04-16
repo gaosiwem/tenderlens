@@ -41,7 +41,7 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:D0_7gm2nM5zQ1v9L1tRmYwPaUxB6cJqZde8fHY3kS@host.docker.internal:5433/postgres}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:-production}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-supabase}
@@ -74,7 +74,7 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:D0_7gm2nM5zQ1v9L1tRmYwPaUxB6cJqZde8fHY3kS@host.docker.internal:5433/postgres}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:-production}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-supabase}
       - SUPABASE_S3_ENDPOINT=${SUPABASE_S3_ENDPOINT:-http://host.docker.internal:8000/storage/v1/s3}
       - SUPABASE_S3_BUCKET=${SUPABASE_S3_BUCKET:-tenderlens}

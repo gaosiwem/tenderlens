@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,6 @@ import { GoogleLogin } from "@react-oauth/google";
 export default function LoginPage() {
   const auth = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [loading, setLoading] = React.useState(false);
   const [changingPassword, setChangingPassword] = React.useState(false);
 
@@ -31,11 +30,12 @@ export default function LoginPage() {
   const googleEnabled = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
 
   React.useEffect(() => {
-    const invitedEmail = searchParams.get("email");
+    if (typeof window === "undefined") return;
+    const invitedEmail = new URLSearchParams(window.location.search).get("email");
     if (invitedEmail) {
       setEmail(invitedEmail);
     }
-  }, [searchParams]);
+  }, []);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
