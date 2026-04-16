@@ -39,7 +39,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:D0_7gm2nM5zQ1v9L1tRmYwPaUxB6cJqZde8fHY3kS@host.docker.internal:5433/postgres}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-TenderLens}:${POSTGRES_PASSWORD:-@TenderLens10111}@host.docker.internal:5433/postgres}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - NODE_ENV=${NODE_ENV:-development}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
@@ -72,7 +72,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:D0_7gm2nM5zQ1v9L1tRmYwPaUxB6cJqZde8fHY3kS@host.docker.internal:5433/postgres}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-TenderLens}:${POSTGRES_PASSWORD:-@TenderLens10111}@host.docker.internal:5433/postgres}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - NODE_ENV=${NODE_ENV:-development}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-supabase}
