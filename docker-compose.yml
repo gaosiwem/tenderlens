@@ -18,6 +18,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
@@ -65,6 +67,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     command: ["npm", "run", "worker:start"]
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
@@ -82,6 +86,7 @@ services:
       - PAYFAST_PASSPHRASE=${PAYFAST_PASSPHRASE}
       # Monitoring
       - SENTRY_DSN=${SENTRY_DSN}
+
 
     volumes:
       - tenderlens_storage:/app/storage
