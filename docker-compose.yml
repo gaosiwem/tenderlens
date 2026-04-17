@@ -113,25 +113,7 @@ services:
       - backend
     restart: always
 
-  # Optional local DB for development (runs only with --profile localdb)
-  db:
-    image: pgvector/pgvector:pg16
-    profiles:
-      - localdb
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-TenderLens}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-@TenderLens10111}
-      POSTGRES_DB: ${POSTGRES_DB:-tenderlens}
-    ports:
-      - "5432:5432"
-    volumes:
-      - tenderlens_pg:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U TenderLens -d tenderlens"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
 volumes:
-  tenderlens_pg:
   tenderlens_storage:
+
