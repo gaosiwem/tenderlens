@@ -37,6 +37,15 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
+      # Billing/Payments
+      - PAYFAST_MERCHANT_ID=${PAYFAST_MERCHANT_ID}
+      - PAYFAST_MERCHANT_KEY=${PAYFAST_MERCHANT_KEY}
+      - PAYFAST_PASSPHRASE=${PAYFAST_PASSPHRASE}
+      - PAYFAST_SANDBOX=${PAYFAST_SANDBOX:-true}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      # Monitoring
+      - SENTRY_DSN=${SENTRY_DSN}
     ports:
       - "${API_PORT:-8081}:8080"
     expose:
@@ -67,6 +76,13 @@ services:
       - SUPABASE_S3_SECRET_ACCESS_KEY=${SUPABASE_S3_SECRET_ACCESS_KEY}
       - SUPABASE_S3_REGION=${SUPABASE_S3_REGION:-auto}
       - SUPABASE_S3_FORCE_PATH_STYLE=${SUPABASE_S3_FORCE_PATH_STYLE:-true}
+      # Billing/Payments
+      - PAYFAST_MERCHANT_ID=${PAYFAST_MERCHANT_ID}
+      - PAYFAST_MERCHANT_KEY=${PAYFAST_MERCHANT_KEY}
+      - PAYFAST_PASSPHRASE=${PAYFAST_PASSPHRASE}
+      # Monitoring
+      - SENTRY_DSN=${SENTRY_DSN}
+
     volumes:
       - tenderlens_storage:/app/storage
     extra_hosts:
