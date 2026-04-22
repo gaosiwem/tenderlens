@@ -27,7 +27,7 @@ jobs:
             cd "${{ secrets.PROD_APP_DIR }}"
 
             git fetch --all
-            git checkout main
+            git checkout -B main origin/main
             git reset --hard origin/main
 
             docker compose -f docker-compose.prod.yml pull || true
