@@ -26,8 +26,23 @@ jobs:
             set -euo pipefail
             cd "${{ secrets.PROD_APP_DIR }}"
 
-            git fetch --all --prune
-            git checkout main || git checkout -b main
+            REPO_URL="${{ secrets.PROD_REPO_URL }}"
+            if [ -z "${REPO_URL}" ]; then
+              REPO_URL="https://github.com/gaosiwem/tenderlens.git"
+            fi
+
+            if [ ! -d .git ]; then
+              git init
+            fi
+
+            if git remote get-url origin >/dev/null 2>&1; then
+              git remote set-url origin "${REPO_URL}"
+            else
+              git remote add origin "${REPO_URL}"
+            fi
+
+            git fetch origin main --prune
+            git checkout -B main origin/main
             git reset --hard origin/main
 
             docker compose -f docker-compose.prod.yml pull || true
