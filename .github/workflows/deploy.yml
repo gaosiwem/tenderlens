@@ -14,6 +14,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure app dir exists
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_PORT }}
+          script_stop: true
+          script: |
+            set -euxo pipefail
+            APP_DIR="${{ secrets.PROD_APP_DIR }}"
+            if [ -z "${APP_DIR}" ]; then
+              echo "PROD_APP_DIR is empty"
+              exit 1
+            fi
+            mkdir -p "${APP_DIR}"
+
+      - name: Upload project files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_PORT }}
+          source: "."
+          target: "${{ secrets.PROD_APP_DIR }}"
+          overwrite: true
+          rm: false
+          strip_components: 0
+          tar_dereference: true
+          tar_tmp_path: /tmp
+          exclude: ".git,node_modules,**/node_modules,.env,backend/.env,frontend/.env.local,COOLIFY_ENV_PRODUCTION.txt,*.log,tmp,scratch"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -30,36 +66,7 @@ jobs:
               echo "PROD_APP_DIR is empty"
               exit 1
             fi
-            mkdir -p "${APP_DIR}"
             cd "${APP_DIR}"
-
-            REPO_URL="${{ secrets.PROD_REPO_URL }}"
-            if [ -z "${REPO_URL}" ]; then
-              REPO_URL="https://github.com/gaosiwem/tenderlens.git"
-            fi
-
-            # Validate branch exists remotely early for clearer errors.
-            git ls-remote --exit-code --heads "${REPO_URL}" main >/dev/null
-            git config --global --add safe.directory "${APP_DIR}" || true
-
-            if [ ! -d .git ]; then
-              if [ -n "$(ls -A . 2>/dev/null)" ]; then
-                echo "Deployment directory is not a git repo and is not empty: ${APP_DIR}"
-                echo "Use an empty folder or clone the repo there once."
-                exit 1
-              fi
-              git init
-            fi
-
-            if git remote get-url origin >/dev/null 2>&1; then
-              git remote set-url origin "${REPO_URL}"
-            else
-              git remote add origin "${REPO_URL}"
-            fi
-
-            git fetch --prune origin main
-            git checkout -B main origin/main
-            git reset --hard origin/main
 
             docker compose -f docker-compose.prod.yml pull || true
             docker compose -f docker-compose.prod.yml up -d --build
