@@ -26,8 +26,8 @@ jobs:
             set -euo pipefail
             cd "${{ secrets.PROD_APP_DIR }}"
 
-            git fetch --all
-            git checkout -B main origin/main
+            git fetch --all --prune
+            git checkout main || git checkout -b main
             git reset --hard origin/main
 
             docker compose -f docker-compose.prod.yml pull || true
