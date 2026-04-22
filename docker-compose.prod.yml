@@ -29,7 +29,7 @@ services:
       timeout: 5s
       retries: 5
 
-  supabase-db:
+  db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
@@ -91,7 +91,7 @@ services:
     expose:
       - "8080"
     depends_on:
-      supabase-db:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -126,7 +126,7 @@ services:
     volumes:
       - tenderlens_storage:/app/storage
     depends_on:
-      supabase-db:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy

@@ -1,6 +1,6 @@
 services:
   # Supabase-compatible Postgres
-  supabase-db:
+  db:
     image: pgvector/pgvector:pg16
     environment:
       - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
@@ -76,7 +76,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      supabase-db:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -119,7 +119,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      supabase-db:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
