@@ -23,15 +23,31 @@ jobs:
           port: ${{ secrets.PROD_PORT }}
           script_stop: true
           script: |
-            set -euo pipefail
-            cd "${{ secrets.PROD_APP_DIR }}"
+            set -euxo pipefail
+
+            APP_DIR="${{ secrets.PROD_APP_DIR }}"
+            if [ -z "${APP_DIR}" ]; then
+              echo "PROD_APP_DIR is empty"
+              exit 1
+            fi
+            mkdir -p "${APP_DIR}"
+            cd "${APP_DIR}"
 
             REPO_URL="${{ secrets.PROD_REPO_URL }}"
             if [ -z "${REPO_URL}" ]; then
               REPO_URL="https://github.com/gaosiwem/tenderlens.git"
             fi
 
+            # Validate branch exists remotely early for clearer errors.
+            git ls-remote --exit-code --heads "${REPO_URL}" main >/dev/null
+            git config --global --add safe.directory "${APP_DIR}" || true
+
             if [ ! -d .git ]; then
+              if [ -n "$(ls -A . 2>/dev/null)" ]; then
+                echo "Deployment directory is not a git repo and is not empty: ${APP_DIR}"
+                echo "Use an empty folder or clone the repo there once."
+                exit 1
+              fi
               git init
             fi
 
@@ -41,7 +57,7 @@ jobs:
               git remote add origin "${REPO_URL}"
             fi
 
-            git fetch origin main --prune
+            git fetch --prune origin main
             git checkout -B main origin/main
             git reset --hard origin/main
 
