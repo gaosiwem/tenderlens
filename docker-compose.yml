@@ -1,6 +1,20 @@
-version: '3.8'
-
 services:
+  # Supabase-compatible Postgres
+  supabase-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+
   # Redis for queues/workers
   redis:
     image: redis:7
@@ -19,11 +33,16 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
-      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@supabase-db:5432/postgres?schema=public}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - NODE_ENV=${NODE_ENV:-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      - COOKIE_SECRET=${COOKIE_SECRET:?COOKIE_SECRET is required}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-supabase}
@@ -57,6 +76,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
+      supabase-db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: always
@@ -68,11 +89,16 @@ services:
       dockerfile: Dockerfile
     command: ["npm", "run", "worker:start"]
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
-      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@supabase-db:5432/postgres?schema=public}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - NODE_ENV=${NODE_ENV:-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      - COOKIE_SECRET=${COOKIE_SECRET:?COOKIE_SECRET is required}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-supabase}
       - SUPABASE_S3_ENDPOINT=${SUPABASE_S3_ENDPOINT}
       - SUPABASE_S3_BUCKET=${SUPABASE_S3_BUCKET}
@@ -93,6 +119,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
+      supabase-db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: always
@@ -107,9 +135,9 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     environment:
-      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     ports:
       - "${FRONTEND_PORT:-3005}:3005"
     expose:
@@ -121,4 +149,3 @@ services:
 
 volumes:
   tenderlens_storage:
-
