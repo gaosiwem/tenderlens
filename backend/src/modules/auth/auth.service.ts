@@ -156,7 +156,8 @@ export async function registerUser(input: {
   if (env.EMAIL_VERIFICATION_REQUIRED) {
     const { token } = await createEmailVerification(user.id)
     verificationToken = token
-    await sendEmailVerificationMessage(user.email, token)
+    // Do not block registration on SMTP/network issues.
+    void sendEmailVerificationMessage(user.email, token)
   }
 
   const { passwordHash, ...userWithoutPassword } = user
@@ -345,7 +346,8 @@ export async function createPasswordReset(email: string) {
     },
   })
 
-  await sendPasswordResetMessage(email, token)
+  // Respond quickly even if SMTP is slow/unavailable.
+  void sendPasswordResetMessage(email, token)
 
   return { ok: true as const, token }
 }
