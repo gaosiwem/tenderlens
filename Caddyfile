@@ -1,5 +1,6 @@
 {
   email {$LETSENCRYPT_EMAIL}
+  acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
 {$APP_DOMAIN} {
