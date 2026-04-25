@@ -36,10 +36,7 @@ export function TLChatComposer(props: {
           {props.sending ? "Sending..." : "Send"}
         </TLButton>
       </div>
-      <div className="mt-2 text-xs text-muted-foreground">
-        The assistant answers using tender chunks only. Always verify critical
-        details in the cited sections.
-      </div>
+
     </div>
   );
 }
