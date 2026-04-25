@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { TenderLensToaster } from "@/components/tenderlens/toaster";
 import { GoogleProvider } from "@/components/providers/google-provider";
+import { GoogleAnalytics } from "@/components/providers/google-analytics";
 
 const publicSans = Public_Sans({
   subsets: ["latin"],
@@ -31,6 +32,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-background text-foreground font-sans min-h-screen overflow-x-hidden">
+        <GoogleAnalytics />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
