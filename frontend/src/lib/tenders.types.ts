@@ -25,6 +25,12 @@ export type Tender = {
   status: TenderStatus;
   amount?: string | null;
   tenderAmount?: string | null;
+  briefingSession?: boolean | null;
+  briefingCompulsory?: boolean | null;
+  briefingDateTime?: string | null;
+  briefingVenue?: string | null;
+  tenderType?: string | null;
+  eSubmission?: boolean | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -33,6 +39,9 @@ export type Tender = {
 export type TenderListItem = Tender & {
   closingDate: string | null;
   companyName: string | null;
+  category: string | null;
+  province: string | null;
+  tenderNumber: string | null;
   amount?: string | null;
   tenderAmount?: string | null;
   lifecycle?: TenderLifecycle;
@@ -59,6 +68,8 @@ export type ScrapedTenderData = {
   externalId: number | null;
   available: boolean;
   tenderNumber: string | null;
+  tenderType: string | null;
+  eSubmission: boolean | null;
   description: string | null;
   category: string | null;
   companyName: string | null;
@@ -68,6 +79,26 @@ export type ScrapedTenderData = {
   closingDate: string | null;
   amount?: string | null;
   tenderAmount?: string | null;
+  briefingSession: boolean | null;
+  briefingCompulsory: boolean | null;
+  briefingDateTime: string | null;
+  briefingVenue: string | null;
+};
+
+export type TenderFilterOptions = {
+  categories: string[];
+  provinces: string[];
+  organsOfState: string[];
+  tenderTypes: string[];
+};
+
+export type TenderAdvancedFilters = {
+  categories: string[];
+  provinces: string[];
+  organsOfState: string[];
+  tenderNumber: string;
+  tenderTypes: string[];
+  eSubmission: "" | "accepting" | "not_accepting";
 };
 
 export type TenderLifecycle = "open" | "awarded" | "closed" | "cancelled";

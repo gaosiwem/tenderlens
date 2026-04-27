@@ -87,26 +87,10 @@ export function TenderLensAppHeader(props: {
             </div>
           </div>
         </div>
-
         <div className="flex flex-1 items-center gap-2 sm:justify-end">
           {props.actions && (
             <div className="flex items-center gap-2 mr-2">{props.actions}</div>
           )}
-          {props.showSearch !== false && !isAdmin ? (
-            <div className="relative w-full max-w-[320px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && q.trim())
-                    router.push(`/search?q=${encodeURIComponent(q)}`);
-                }}
-                placeholder="Search..."
-                className="h-10 pl-9"
-              />
-            </div>
-          ) : null}
 
           <div className="hidden sm:block">
             <ModeToggle />
@@ -117,7 +101,7 @@ export function TenderLensAppHeader(props: {
               <button className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                 <Avatar className="size-8">
                   <AvatarFallback className="bg-primary/15 text-primary">
-                    {auth.me?.user.email?.slice(0, 2).toUpperCase() ?? "TL"}
+                    {auth.me?.user.email?.slice(0, 2) ?? "tl"}
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden text-sm font-semibold xl:block max-w-[100px] truncate">
@@ -127,7 +111,7 @@ export function TenderLensAppHeader(props: {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
               <div className="mx-2 mt-2 mb-1 rounded-md border border-border/60 bg-muted/20 p-3">
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="text-[10px] font-bold tracking-[0.18em] text-muted-foreground">
                   User Profile
                 </div>
                 <div className="mt-2 text-sm font-semibold text-foreground">

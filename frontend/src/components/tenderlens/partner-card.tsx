@@ -46,13 +46,13 @@ export function TLPartnerCard(props: { partner: Partner }) {
               {props.partner.email}
             </div>
           </div>
-          <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.15em] border border-primary/20 backdrop-blur-md">
+          <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-bold tracking-[0.15em] border border-primary/20 backdrop-blur-md">
             {props.partner.tier?.name ?? "Standard Partner"}
           </div>
         </div>
 
         <div className="pt-4 border-t border-border/40 relative z-10">
-          <div className="text-[10px] text-muted-foreground/50 uppercase font-bold tracking-[0.2em] mb-2">
+          <div className="text-[10px] text-muted-foreground/50 font-bold tracking-[0.2em] mb-2">
             Revenue Share
           </div>
           <div className="text-3xl font-display font-extrabold text-primary">
@@ -71,7 +71,7 @@ export function TLPartnerCard(props: { partner: Partner }) {
             </TLButton>
           ) : (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <div className="text-[10px] text-muted-foreground/50 uppercase font-bold tracking-[0.2em]">
+              <div className="text-[10px] text-muted-foreground/50 font-bold tracking-[0.2em]">
                 Your Active Tracking Code
               </div>
               <div className="flex items-center gap-3">

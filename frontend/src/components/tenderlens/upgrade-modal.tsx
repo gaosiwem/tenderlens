@@ -53,14 +53,14 @@ export function TLUpgradeModal(props: {
           <div className="mt-8 flex flex-col gap-3">
             <TLButton
               onClick={props.onUpgrade}
-              className="h-12 text-sm font-bold uppercase tracking-widest shadow-lg shadow-primary/20"
+              className="h-12 text-sm font-bold tracking-widest shadow-lg shadow-primary/20"
             >
               {cta}
             </TLButton>
             <TLButton
               variant="ghost"
               onClick={() => props.onOpenChange(false)}
-              className="text-muted-foreground hover:text-foreground text-xs font-bold uppercase tracking-widest h-10"
+              className="text-muted-foreground hover:text-foreground text-xs font-bold tracking-widest h-10"
             >
               Maybe later
             </TLButton>

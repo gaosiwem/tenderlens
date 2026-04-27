@@ -126,7 +126,7 @@ export default function MembersPage() {
         <div className="grid gap-3">
           {loading ? (
             <div className="p-12 text-center border border-border border-dashed rounded-2xl">
-              <div className="text-sm text-muted-foreground animate-pulse font-medium uppercase tracking-widest text-[10px]">
+              <div className="text-sm text-muted-foreground animate-pulse font-medium tracking-widest text-[10px]">
                 Syncing team data...
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function MembersPage() {
               >
                 <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm border border-primary/20 shrink-0 uppercase">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm border border-primary/20 shrink-0 ">
                       {(m.name || m.email || "?").charAt(0)}
                     </div>
                     <div className="space-y-0.5">
@@ -152,7 +152,7 @@ export default function MembersPage() {
                         <span className="text-sm font-bold text-foreground">
                           {m.name || "Untitled User"}
                         </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground uppercase border border-border/50">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground border border-border/50">
                           {m.role}
                         </span>
                       </div>
@@ -162,7 +162,7 @@ export default function MembersPage() {
                       </div>
                       <div className="flex flex-wrap gap-2 mt-1.5">
                         {m.isBillingAdmin ? (
-                          <div className="flex items-center gap-1.5 text-[9px] font-extrabold text-primary bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10 uppercase tracking-tighter">
+                          <div className="flex items-center gap-1.5 text-[9px] font-extrabold text-primary bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10 tracking-tighter">
                             <Shield className="w-2.5 h-2.5" />
                             Billing Access
                           </div>

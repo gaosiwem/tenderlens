@@ -39,7 +39,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { formatDate } from "@/lib/date-utils";
+import { formatDate, formatDateTime } from "@/lib/date-utils";
 import { useBilling } from "@/hooks/use-billing";
 
 export default function TenderDetailPage() {
@@ -334,6 +334,14 @@ export default function TenderDetailPage() {
     });
   }, [externalDocs, files]);
 
+  const briefingSession =
+    scraped?.briefingSession ?? tender?.briefingSession ?? null;
+  const briefingCompulsory =
+    scraped?.briefingCompulsory ?? tender?.briefingCompulsory ?? null;
+  const briefingDateTime =
+    scraped?.briefingDateTime ?? tender?.briefingDateTime ?? null;
+  const briefingVenue = scraped?.briefingVenue ?? tender?.briefingVenue ?? null;
+
   function closingUrgency(value: string | null) {
     if (!value) return "Closing date not available in scraped data.";
     const d = new Date(value);
@@ -347,6 +355,12 @@ export default function TenderDetailPage() {
     if (diffDays === 0) return "Closes today.";
     if (diffDays === 1) return "Closes tomorrow.";
     return `Closes in ${diffDays} day(s).`;
+  }
+
+  function formatBriefingFlag(value: boolean | null | undefined) {
+    if (value === true) return "Yes";
+    if (value === false) return "No";
+    return "N/A";
   }
 
   if (loading) {
@@ -439,7 +453,7 @@ export default function TenderDetailPage() {
           <Card className="min-w-0 w-full">
             <CardContent className="pt-6 space-y-5 overflow-hidden">
               <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                <div className="text-sm font-semibold tracking-wide text-primary">
                   Closing Date
                 </div>
                 <div className="mt-1 flex items-center gap-2">
@@ -448,59 +462,93 @@ export default function TenderDetailPage() {
                     {formatDate(scraped?.closingDate ?? null)}
                   </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-sm text-muted-foreground">
                   {closingUrgency(scraped?.closingDate ?? null)}
                 </div>
               </div>
 
               <div className="min-w-0 w-full text-sm">
                 <div className="block rounded-sm">
-                  <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                  <div className="text-muted-foreground text-sm tracking-wide">
                     Tender Title
                   </div>
-                  <h1 className="text-sm font-bold tracking-tight text-foreground/90 md:text-base break-words">
+                  <h1 className="text-base font-bold tracking-tight text-foreground/90 md:text-lg break-words">
                     {tender.title}
                   </h1>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-base">
                 <div>
-                  <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                  <div className="text-muted-foreground text-sm tracking-wide">
                     Tender Number
                   </div>
                   <div>{scraped?.tenderNumber || "-"}</div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                  <div className="text-muted-foreground text-sm tracking-wide">
                     Procuring Entity
                   </div>
                   <div>{scraped?.companyName || "-"}</div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                  <div className="text-muted-foreground text-sm tracking-wide">
                     Category
                   </div>
                   <div>{scraped?.category || "-"}</div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                  <div className="text-muted-foreground text-sm tracking-wide">
                     Province
                   </div>
                   <div>{scraped?.province || "-"}</div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                  <div className="text-muted-foreground text-sm tracking-wide">
                     Published Date
                   </div>
                   <div>{formatDate(scraped?.publishedDate ?? null)}</div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                  <div className="text-muted-foreground text-sm tracking-wide">
                     External Tender ID
                   </div>
                   <div>
                     {scraped?.externalId ? String(scraped.externalId) : "-"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                <div className="text-sm font-semibold tracking-wide text-muted-foreground">
+                  Briefing Session
+                </div>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 text-base">
+                  <div>
+                    <div className="text-muted-foreground text-sm tracking-wide">
+                      Is there a briefing session?
+                    </div>
+                    <div>{formatBriefingFlag(briefingSession)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground text-sm tracking-wide">
+                      Is it compulsory?
+                    </div>
+                    <div>{formatBriefingFlag(briefingCompulsory)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground text-sm tracking-wide">
+                      Briefing Date and Time
+                    </div>
+                    <div>
+                      {briefingDateTime ? formatDateTime(briefingDateTime) : "N/A"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground text-sm tracking-wide">
+                      Briefing Venue
+                    </div>
+                    <div>{briefingVenue || "N/A"}</div>
                   </div>
                 </div>
               </div>
@@ -537,7 +585,7 @@ export default function TenderDetailPage() {
                         </div>
                         <div className="min-w-0">
                           <div className="font-medium truncate">{doc.name}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-sm text-muted-foreground">
                             Source: eTenders
                           </div>
                         </div>
@@ -579,7 +627,7 @@ export default function TenderDetailPage() {
                           <div className="font-medium truncate">
                             {f.originalFilename}
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-sm text-muted-foreground">
                             {(f.sizeBytes / 1024 / 1024).toFixed(2)} MB -{" "}
                             {f.mimeType}
                           </div>
@@ -598,7 +646,7 @@ export default function TenderDetailPage() {
                             ? "Downloading..."
                             : "Download"}
                         </button>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-sm text-muted-foreground">
                           {new Date(f.createdAt).toLocaleDateString()}
                         </div>
                       </div>

@@ -152,7 +152,7 @@ export default function NotificationSettingsPage() {
                         <div className="text-sm font-semibold">
                           Email Alerts
                         </div>
-                        <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                        <div className="text-[10px] text-muted-foreground font-medium tracking-wider">
                           Primary Channel
                         </div>
                       </div>
@@ -226,7 +226,7 @@ export default function NotificationSettingsPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                      <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                         From
                       </div>
                       <Input
@@ -237,7 +237,7 @@ export default function NotificationSettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                      <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                         Until
                       </div>
                       <Input

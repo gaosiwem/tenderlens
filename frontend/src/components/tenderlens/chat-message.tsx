@@ -50,7 +50,7 @@ export function TLChatMessage(props: {
                   {speakerLabel}
                 </div>
                 {!isUser ? (
-                  <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">
+                  <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold tracking-[0.18em] text-primary/80">
                     <Sparkles className="size-3" />
                     Answer grounded in tender context
                   </div>

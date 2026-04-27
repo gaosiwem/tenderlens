@@ -88,13 +88,13 @@ export default function BillingSettingsPage() {
             <div className="rounded-2xl border border-border bg-background p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-display text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <div className="font-display text-[10px] font-bold tracking-widest text-muted-foreground">
                     Current Plan
                   </div>
                   <div className="mt-2 text-2xl font-bold font-display tracking-tight text-primary">
                     {planLabel}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1.5 uppercase font-bold tracking-tighter">
+                  <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1.5 font-bold tracking-tighter">
                     Status:{" "}
                     <span
                       className={`px-1.5 py-0.5 rounded-md ${
@@ -109,7 +109,7 @@ export default function BillingSettingsPage() {
                   </div>
                 </div>
                 {!isFree && subscription?.currentPeriodEnd && (
-                  <div className="text-right text-xs text-muted-foreground uppercase font-bold tracking-widest">
+                  <div className="text-right text-xs text-muted-foreground font-bold tracking-widest">
                     Next renewal
                     <div className="mt-1 text-sm font-extrabold text-foreground tabular-nums">
                       {new Date(
@@ -124,7 +124,7 @@ export default function BillingSettingsPage() {
               <div className="rounded-2xl border border-border bg-background p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-display text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    <div className="font-display text-[10px] font-bold tracking-widest text-muted-foreground">
                       Team Members
                     </div>
                     <div className="mt-2 text-2xl font-bold font-display tracking-tight flex items-center gap-2">

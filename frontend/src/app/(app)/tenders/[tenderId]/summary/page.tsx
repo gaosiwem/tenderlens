@@ -358,7 +358,7 @@ export default function TenderSummaryPage() {
                           {summaryMarkdown}
                         </ReactMarkdown>
                       </div>
-                      <div className="mx-auto max-w-4xl mt-12 pt-6 border-t border-border/50 text-[11px] font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <div className="mx-auto max-w-4xl mt-12 pt-6 border-t border-border/50 text-[11px] font-medium tracking-wider text-muted-foreground flex items-center gap-2">
                         <FileText className="size-3.5" />
                         <span>
                           Generated on {summaryGeneratedLabel ?? "Unknown"}
@@ -390,7 +390,7 @@ export default function TenderSummaryPage() {
                       </div>
                       <div className="mt-5 grid gap-4 md:grid-cols-2">
                         <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
                             <Clock3 className="size-3.5" />
                             Closing Date
                           </div>
@@ -399,7 +399,7 @@ export default function TenderSummaryPage() {
                           </div>
                         </div>
                         <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
                             <Clock3 className="size-3.5" />
                             Briefing Session
                           </div>
@@ -422,7 +422,7 @@ export default function TenderSummaryPage() {
                       </div>
                       <div className="mt-5 grid gap-4 md:grid-cols-3">
                         <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
                             <User2 className="size-3.5" />
                             Contact Person
                           </div>
@@ -431,7 +431,7 @@ export default function TenderSummaryPage() {
                           </div>
                         </div>
                         <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
                             <Mail className="size-3.5" />
                             Email
                           </div>
@@ -440,7 +440,7 @@ export default function TenderSummaryPage() {
                           </div>
                         </div>
                         <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
                             <Phone className="size-3.5" />
                             Phone
                           </div>
@@ -451,7 +451,7 @@ export default function TenderSummaryPage() {
                       </div>
                       {enquiryContacts.length > 0 ? (
                         <div className="mt-6 rounded-xl border border-border/60 bg-background/40 p-4">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
                             Enquiries Contacts
                           </div>
                           <div className="mt-3 space-y-3">

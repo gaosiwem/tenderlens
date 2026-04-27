@@ -19,13 +19,50 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiFetch } from "@/lib/api";
-import type { TenderListItem } from "@/lib/tenders.types";
+import type {
+  TenderAdvancedFilters,
+  TenderFilterOptions,
+  TenderListItem,
+} from "@/lib/tenders.types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/date-utils";
+import {
+  emptyTenderAdvancedFilters,
+  hasActiveFilters,
+  parseTenderAdvancedFilters,
+  TenderAdvancedFiltersPanel,
+} from "@/components/tenderlens/tender-advanced-filters";
 
 type SortField = "title" | "closingDate" | "companyName";
 type SortDirection = "asc" | "desc";
 type Lifecycle = "awarded" | "closed" | "cancelled";
+
+const emptyFilterOptions: TenderFilterOptions = {
+  categories: [],
+  provinces: [],
+  organsOfState: [],
+  tenderTypes: [],
+};
+
+function serializeFilters(filters: TenderAdvancedFilters) {
+  return {
+    categories: filters.categories.join(","),
+    provinces: filters.provinces.join(","),
+    organsOfState: filters.organsOfState.join(","),
+    tenderNumber: filters.tenderNumber.trim(),
+    tenderTypes: filters.tenderTypes.join(","),
+    eSubmission: filters.eSubmission,
+  };
+}
+
+function appendAdvancedFilters(
+  params: URLSearchParams,
+  filters: TenderAdvancedFilters,
+) {
+  Object.entries(serializeFilters(filters)).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+}
 
 function parsePositiveInt(value: string | null, fallback: number) {
   const parsed = Number(value ?? String(fallback));
@@ -79,6 +116,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
   const initialPageSize = parsePositiveInt(searchParams.get("pageSize"), 10);
   const initialSortField = parseSortField(searchParams.get("sort"));
   const initialSortDir = parseSortDirection(searchParams.get("dir"));
+  const initialAdvancedFilters = parseTenderAdvancedFilters(searchParams);
 
   const [tenders, setTenders] = React.useState<TenderListItem[]>([]);
   const [totalItems, setTotalItems] = React.useState(0);
@@ -90,6 +128,10 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
     React.useState<SortDirection>(initialSortDir);
   const [page, setPage] = React.useState(initialPage);
   const [pageSize, setPageSize] = React.useState(initialPageSize);
+  const [advancedFilters, setAdvancedFilters] =
+    React.useState<TenderAdvancedFilters>(initialAdvancedFilters);
+  const [filterOptions, setFilterOptions] =
+    React.useState<TenderFilterOptions>(emptyFilterOptions);
 
   const syncToUrl = React.useCallback(
     (updates: Record<string, string | number | null>) => {
@@ -120,6 +162,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
       if (debouncedSearch.trim()) {
         params.set("search", debouncedSearch.trim());
       }
+      appendAdvancedFilters(params, advancedFilters);
 
       const res = await apiFetch<{
         items: TenderListItem[];
@@ -139,7 +182,16 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, isReady, lifecycle, page, pageSize, sortDirection, sortField]);
+  }, [
+    advancedFilters,
+    debouncedSearch,
+    isReady,
+    lifecycle,
+    page,
+    pageSize,
+    sortDirection,
+    sortField,
+  ]);
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 250);
@@ -149,6 +201,13 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
   React.useEffect(() => {
     void loadTenders();
   }, [loadTenders]);
+
+  React.useEffect(() => {
+    if (!isReady) return;
+    apiFetch<TenderFilterOptions>("/api/v1/tenders/filters").then((res) => {
+      if (res.ok) setFilterOptions(res.data);
+    });
+  }, [isReady]);
 
   function handleSort(field: SortField) {
     let nextDir: SortDirection = "asc";
@@ -185,6 +244,16 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
     [syncToUrl, totalPages],
   );
 
+  const handleAdvancedFiltersChange = (filters: TenderAdvancedFilters) => {
+    setAdvancedFilters(filters);
+    setPage(1);
+    syncToUrl({ ...serializeFilters(filters), page: 1 });
+  };
+
+  const handleAdvancedFiltersReset = () => {
+    handleAdvancedFiltersChange(emptyTenderAdvancedFilters());
+  };
+
   React.useEffect(() => {
     if (!loading && page > totalPages && totalItems > 0) {
       handlePageChange(totalPages);
@@ -210,36 +279,58 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
     <TenderLensAppShell title={pageTitle} description={description} contentWidth="wide">
       <TLSection>
         <TLTableShell title={tableTitle}>
-          {!loading && totalItems === 0 && search.trim().length === 0 ? (
-            <div className="p-6">
-              <TLEmptyState title={emptyTitle} description={emptyDescription} />
+          <TenderAdvancedFiltersPanel
+            filters={advancedFilters}
+            options={filterOptions}
+            onChange={handleAdvancedFiltersChange}
+            onReset={handleAdvancedFiltersReset}
+            leading={
+              <input
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Filter by title or company..."
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-64"
+              />
+            }
+            trailing={
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Rows per page</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) =>
+                    handlePageSizeChange(Number(e.target.value))
+                  }
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            }
+          />
+
+          {!loading && totalItems === 0 ? (
+            <div className="p-12 border-t flex flex-col items-center justify-center bg-muted/5">
+              <TLEmptyState
+                title={search || hasActiveFilters(advancedFilters) ? "No results found" : emptyTitle}
+                description={search || hasActiveFilters(advancedFilters) 
+                  ? "No tenders match your current search or filters. Try adjusting them to see more results."
+                  : emptyDescription}
+              />
+              {(search || hasActiveFilters(advancedFilters)) && (
+                <TLButton 
+                  variant="outline" 
+                  onClick={handleAdvancedFiltersReset}
+                  className="mt-4"
+                >
+                  Clear all filters
+                </TLButton>
+              )}
             </div>
           ) : (
             <>
-              <div className="border-b px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-2">
-                  <input
-                    value={search}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    placeholder="Filter by title or company..."
-                    className="h-9 w-64 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Rows per page</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                    className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-              </div>
-
+              <div className="pt-8">
               <Table className="table-auto min-w-full">
                 <TableHeader>
                   <TableRow>
@@ -351,6 +442,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
                   ) : null}
                 </TableBody>
               </Table>
+              </div>
               <div className="border-t px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-muted-foreground">
                   {totalItems === 0

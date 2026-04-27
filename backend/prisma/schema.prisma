@@ -215,6 +215,8 @@ model Tender {
   externalId      Int?
   available       Boolean       @default(false)
   tenderNumber    String?
+  tenderType      String?
+  eSubmission     Boolean?
   description     String?
   category        String?
   companyName     String?
@@ -223,6 +225,10 @@ model Tender {
   publishedDate   String?
   closingDate     String?
   amount          String?
+  briefingSession Boolean?
+  briefingCompulsory Boolean?
+  briefingDateTime String?
+  briefingVenue   String?
   documents       Json?
   lastScrapedAt   DateTime?
   createdByUserId String

@@ -31,7 +31,7 @@ export function TLPlanCard(props: {
       className={`tl-surface h-full relative overflow-hidden ${props.highlight ? "ring-2 ring-primary" : ""}`}
     >
       {props.highlight && (
-        <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-bl-lg uppercase">
+        <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-bl-lg ">
           Recommended
         </div>
       )}

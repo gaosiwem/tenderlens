@@ -20,7 +20,7 @@ export function TLKeyValueGrid(props: {
                 key={idx}
                 className="rounded-lg border border-border bg-background/30 p-4"
               >
-                <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
                   {it.label}
                 </div>
                 <div className="mt-2 text-sm font-semibold break-words">

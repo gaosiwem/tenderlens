@@ -78,7 +78,7 @@ export default function NewChatPage() {
             />
           ) : null}
 
-          <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
             Title
           </div>
           <Input

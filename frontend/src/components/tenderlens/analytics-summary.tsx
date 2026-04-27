@@ -12,7 +12,7 @@ export function TLAnalyticsSummary(props: {
         <div className="p-5 border-b border-border/50 flex items-center justify-between bg-muted/30">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-primary" />
-            <h3 className="font-display text-sm font-extrabold uppercase tracking-tight">
+            <h3 className="font-display text-sm font-extrabold tracking-tight">
               Conversion Funnel Analytics
             </h3>
           </div>
@@ -33,7 +33,7 @@ export function TLAnalyticsSummary(props: {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/30">
+                  <tr className="bg-muted/50 text-[10px] font-bold text-muted-foreground tracking-widest border-b border-border/30">
                     <th className="text-left py-3 px-5 font-bold">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3 h-3" />
@@ -61,7 +61,7 @@ export function TLAnalyticsSummary(props: {
                         {r.day}
                       </td>
                       <td className="py-3 px-5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-[10px] font-bold text-foreground uppercase border border-border group-hover:bg-primary/10 group-hover:border-primary/20 transition-colors">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-[10px] font-bold text-foreground border border-border group-hover:bg-primary/10 group-hover:border-primary/20 transition-colors">
                           {r.name.replace(/_/g, " ")}
                         </span>
                       </td>

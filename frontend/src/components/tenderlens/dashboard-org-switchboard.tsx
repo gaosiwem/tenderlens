@@ -44,7 +44,7 @@ export function TLDashboardOrgSwitchboard(props: {
                           <div className="truncate font-display text-base font-extrabold tracking-tight">
                             {membership.org.name}
                           </div>
-                          <div className="truncate text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          <div className="truncate text-xs tracking-[0.18em] text-muted-foreground">
                             {membership.org.slug}
                           </div>
                         </div>

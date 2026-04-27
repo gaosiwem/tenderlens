@@ -40,7 +40,7 @@ export default function BillingAnalyticsPage() {
         right={
           <div className="flex items-center gap-3">
             <select
-              className="h-10 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg border bg-background text-foreground outline-none transition-all cursor-pointer"
+              className="h-10 px-3 text-[10px] font-bold tracking-wider rounded-lg border bg-background text-foreground outline-none transition-all cursor-pointer"
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
             >
@@ -65,7 +65,7 @@ export default function BillingAnalyticsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="hover:border-blue-500/20 transition-all">
               <CardContent className="p-6 flex flex-col gap-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <span className="text-[10px] font-bold text-muted-foreground tracking-widest">
                   Pricing Views
                 </span>
                 <span className="text-3xl font-bold">
@@ -81,7 +81,7 @@ export default function BillingAnalyticsPage() {
 
             <Card className="hover:border-amber-500/20 transition-all">
               <CardContent className="p-6 flex flex-col gap-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <span className="text-[10px] font-bold text-muted-foreground tracking-widest">
                   Checkout Started
                 </span>
                 <span className="text-3xl font-bold text-amber-500">
@@ -97,7 +97,7 @@ export default function BillingAnalyticsPage() {
 
             <Card className="hover:border-emerald-500/20 transition-all">
               <CardContent className="p-6 flex flex-col gap-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <span className="text-[10px] font-bold text-muted-foreground tracking-widest">
                   Conversions
                 </span>
                 <span className="text-3xl font-bold text-emerald-500">
@@ -124,7 +124,7 @@ export default function BillingAnalyticsPage() {
                 </div>
                 <div>
                   <p className="text-sm font-bold">Advanced Export</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">
+                  <p className="text-[10px] text-muted-foreground font-bold tracking-widest mt-1">
                     Generate full report for external stakeholders
                   </p>
                 </div>

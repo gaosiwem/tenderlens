@@ -40,7 +40,7 @@ export default function AdminRevenuePage() {
         {data && (
           <Card className="bg-primary/5 border-primary/10 min-w-[200px]">
             <CardContent className="p-4">
-              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
+              <div className="text-[10px] font-bold text-muted-foreground tracking-widest mb-1">
                 Active Subscriptions
               </div>
               <div className="text-3xl font-display font-bold">
@@ -58,7 +58,7 @@ export default function AdminRevenuePage() {
               <div className="absolute inset-0 rounded-full border-2 border-primary/10" />
               <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
             </div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground animate-pulse">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground animate-pulse">
               Synthesizing Financial Data...
             </div>
           </div>
@@ -82,7 +82,7 @@ export default function AdminRevenuePage() {
 
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-[10px] font-extrabold tracking-widest text-muted-foreground uppercase mb-6 border-b pb-4">
+                  <div className="text-[10px] font-extrabold tracking-widest text-muted-foreground mb-6 border-b pb-4">
                     Payout Automation
                   </div>
 

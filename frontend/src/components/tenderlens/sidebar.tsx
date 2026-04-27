@@ -45,7 +45,6 @@ const mainNavItems = [
   { href: "/awarded", label: "Awarded", icon: Shield },
   { href: "/closed", label: "Closed", icon: AlertCircle },
   { href: "/cancelled", label: "Cancelled", icon: AlertCircle },
-  { href: "/search", label: "Search", icon: Search },
   { href: "/compare", label: "Compare", icon: ArrowLeftRight },
   { href: "/chat", label: "Chat Hub", icon: MessagesSquare },
 ];
@@ -152,7 +151,7 @@ export function TenderLensSidebar() {
           </span>
         ) : null}
         {it.beta && (
-          <span className="ml-auto text-[8px] font-black uppercase tracking-tighter bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm border border-primary/20">
+          <span className="ml-auto text-[8px] font-black tracking-tighter bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm border border-primary/20">
             Beta
           </span>
         )}
@@ -174,7 +173,7 @@ export function TenderLensSidebar() {
       <div className="mt-4 first:mt-0">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex w-full items-center justify-between px-2 py-2 text-[10px] font-bold tracking-widest text-muted-foreground uppercase hover:text-foreground transition-colors group"
+          className="flex w-full items-center justify-between px-2 py-2 text-[10px] font-bold tracking-widest text-muted-foreground hover:text-foreground transition-colors group"
         >
           {title}
           <ChevronDown
@@ -260,7 +259,7 @@ export function TenderLensSidebar() {
         subscription?.status === "TRIALING" &&
         trialEndDate ? (
           <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary/75">
+            <div className="text-[10px] font-bold tracking-[0.22em] text-primary/75">
               Trial Access
             </div>
             <div className="mt-2 text-sm font-semibold text-foreground">

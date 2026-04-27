@@ -332,7 +332,7 @@ export default function WorkspacePage() {
                 "It seems this tender does not have an active workspace yet."}
             </div>
             {workspaceError?.code ? (
-              <div className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <div className="mt-2 text-[10px] tracking-wider text-muted-foreground">
                 Error code: {workspaceError.code}
               </div>
             ) : null}
@@ -358,7 +358,7 @@ export default function WorkspacePage() {
                           href={`/tenders/${tenderId}`}
                           className="block rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                         >
-                          <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                          <div className="text-muted-foreground text-xs tracking-wide">
                             Tender Title
                           </div>
                           <h1 className="text-sm font-bold tracking-tight text-foreground/90 md:text-base break-words">
@@ -367,7 +367,7 @@ export default function WorkspacePage() {
                         </Link>
                       </div>
                     ) : null}
-                    <div className="font-display text-base font-extrabold uppercase tracking-tight">
+                    <div className="font-display text-base font-extrabold tracking-tight">
                       Bid Status
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
@@ -389,7 +389,7 @@ export default function WorkspacePage() {
                         key={s}
                         onClick={() => setStatus(s)}
                         disabled={savingStatus !== null || savingDecision !== null}
-                        className={`px-3 py-1.5 text-[10px] font-bold uppercase transition-colors rounded-lg border ${status === s ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-background hover:bg-muted text-muted-foreground"}`}
+                        className={`px-3 py-1.5 text-[10px] font-bold transition-colors rounded-lg border ${status === s ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-background hover:bg-muted text-muted-foreground"}`}
                       >
                         {savingStatus === s ? (
                           <RefreshCcwIcon className="mr-1 inline size-3 animate-spin" />
@@ -409,14 +409,14 @@ export default function WorkspacePage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="text-xs font-semibold mr-2 uppercase tracking-wider text-muted-foreground">
+                    <div className="text-xs font-semibold mr-2 tracking-wider text-muted-foreground">
                       Decision
                     </div>
                     <div className="flex items-center border border-border rounded-lg overflow-hidden">
                       <button
                         onClick={() => setDecision("Bid")}
                         disabled={savingStatus !== null || savingDecision !== null}
-                        className={`px-3 py-1.5 text-[10px] font-bold uppercase transition-colors ${decision === "Bid" ? "bg-emerald-500 text-white" : "bg-background hover:bg-muted text-muted-foreground"}`}
+                        className={`px-3 py-1.5 text-[10px] font-bold transition-colors ${decision === "Bid" ? "bg-emerald-500 text-white" : "bg-background hover:bg-muted text-muted-foreground"}`}
                       >
                         {savingDecision === "Bid" ? (
                           <RefreshCcwIcon className="mr-1 inline size-3 animate-spin" />
@@ -426,7 +426,7 @@ export default function WorkspacePage() {
                       <button
                         onClick={() => setDecision("No-bid")}
                         disabled={savingStatus !== null || savingDecision !== null}
-                        className={`px-3 py-1.5 text-[10px] font-bold uppercase transition-colors ${decision === "No-bid" ? "bg-destructive text-white" : "bg-background hover:bg-muted text-muted-foreground"}`}
+                        className={`px-3 py-1.5 text-[10px] font-bold transition-colors ${decision === "No-bid" ? "bg-destructive text-white" : "bg-background hover:bg-muted text-muted-foreground"}`}
                       >
                         {savingDecision === "No-bid" ? (
                           <RefreshCcwIcon className="mr-1 inline size-3 animate-spin" />
@@ -436,7 +436,7 @@ export default function WorkspacePage() {
                       <button
                         onClick={() => setDecision(null)}
                         disabled={savingStatus !== null || savingDecision !== null}
-                        className={`px-3 py-1.5 text-[10px] font-bold uppercase transition-colors border-l border-border ${!decision ? "bg-secondary text-secondary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
+                        className={`px-3 py-1.5 text-[10px] font-bold transition-colors border-l border-border ${!decision ? "bg-secondary text-secondary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
                       >
                         {savingDecision === "clear" ? (
                           <RefreshCcwIcon className="mr-1 inline size-3 animate-spin" />
@@ -467,7 +467,7 @@ export default function WorkspacePage() {
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-display text-base font-extrabold uppercase tracking-tight">
+                        <div className="font-display text-base font-extrabold tracking-tight">
                           Bid Tasks
                         </div>
                         <div className="text-xs text-muted-foreground">

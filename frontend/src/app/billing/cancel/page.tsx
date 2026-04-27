@@ -24,7 +24,7 @@ export default function BillingCancelPage() {
       <div className="mx-auto flex min-h-screen max-w-3xl items-center px-4 py-10">
         <div className="w-full rounded-3xl border border-border bg-card p-8 shadow-sm sm:p-10">
           <div className="mb-8">
-            <div className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="text-xs font-bold tracking-[0.2em] text-muted-foreground">
               TenderLens
             </div>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">

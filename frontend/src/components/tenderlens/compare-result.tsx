@@ -170,7 +170,7 @@ function renderStructuredValue(value: unknown): React.ReactNode {
       <div className="space-y-3">
         {entries.map(([key, nestedValue]) => (
           <div key={key} className="rounded-lg border border-border/70 bg-background/70 p-3">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground">
               {prettifyKey(key)}
             </div>
             {renderStructuredValue(nestedValue)}

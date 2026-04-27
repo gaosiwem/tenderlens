@@ -20,13 +20,50 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiFetch } from "@/lib/api";
-import type { TenderListItem } from "@/lib/tenders.types";
+import type {
+  TenderAdvancedFilters,
+  TenderFilterOptions,
+  TenderListItem,
+} from "@/lib/tenders.types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/date-utils";
+import {
+  emptyTenderAdvancedFilters,
+  hasActiveFilters,
+  parseTenderAdvancedFilters,
+  TenderAdvancedFiltersPanel,
+} from "@/components/tenderlens/tender-advanced-filters";
 
 type SortField = "title" | "status" | "closingDate" | "companyName";
 type SortDirection = "asc" | "desc";
 type LifecycleFilter = "open" | "awarded" | "closed" | "cancelled" | "all";
+
+const emptyFilterOptions: TenderFilterOptions = {
+  categories: [],
+  provinces: [],
+  organsOfState: [],
+  tenderTypes: [],
+};
+
+function serializeFilters(filters: TenderAdvancedFilters) {
+  return {
+    categories: filters.categories.join(","),
+    provinces: filters.provinces.join(","),
+    organsOfState: filters.organsOfState.join(","),
+    tenderNumber: filters.tenderNumber.trim(),
+    tenderTypes: filters.tenderTypes.join(","),
+    eSubmission: filters.eSubmission,
+  };
+}
+
+function appendAdvancedFilters(
+  params: URLSearchParams,
+  filters: TenderAdvancedFilters,
+) {
+  Object.entries(serializeFilters(filters)).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+}
 
 function getDefaultSortDirection(
   lifecycle: LifecycleFilter,
@@ -90,6 +127,7 @@ export default function TendersPage() {
   const initialPage = Number(searchParams.get("page") ?? "1");
   const initialPageSize = Number(searchParams.get("pageSize") ?? "10");
   const initialLifecycle = normalizeLifecycle(searchParams.get("lifecycle"));
+  const initialAdvancedFilters = parseTenderAdvancedFilters(searchParams);
   const initialSortField =
     (searchParams.get("sort") as SortField) ?? "closingDate";
   const initialSortDir = normalizeSortDirection(
@@ -110,6 +148,10 @@ export default function TendersPage() {
     React.useState<LifecycleFilter>(initialLifecycle);
   const [page, setPage] = React.useState(initialPage);
   const [pageSize, setPageSize] = React.useState(initialPageSize);
+  const [advancedFilters, setAdvancedFilters] =
+    React.useState<TenderAdvancedFilters>(initialAdvancedFilters);
+  const [filterOptions, setFilterOptions] =
+    React.useState<TenderFilterOptions>(emptyFilterOptions);
   const { isReady } = useAuth();
   const { subscription } = useBilling();
   const isExpiredReadOnly = subscription?.status === "EXPIRED";
@@ -144,6 +186,7 @@ export default function TendersPage() {
     if (debouncedSearch.trim()) {
       params.set("search", debouncedSearch.trim());
     }
+    appendAdvancedFilters(params, advancedFilters);
 
     try {
       const res = await apiFetch<{
@@ -164,6 +207,7 @@ export default function TendersPage() {
     }
   }, [
     debouncedSearch,
+    advancedFilters,
     isReady,
     lifecycle,
     page,
@@ -193,6 +237,13 @@ export default function TendersPage() {
   React.useEffect(() => {
     void loadTenders();
   }, [loadTenders]);
+
+  React.useEffect(() => {
+    if (!isReady) return;
+    apiFetch<TenderFilterOptions>("/api/v1/tenders/filters").then((res) => {
+      if (res.ok) setFilterOptions(res.data);
+    });
+  }, [isReady]);
 
   function handleSort(field: SortField) {
     let nextDir: SortDirection = "asc";
@@ -224,6 +275,16 @@ export default function TendersPage() {
     const next = Math.max(1, Math.min(totalPages, value));
     setPage(next);
     syncToUrl({ page: next });
+  };
+
+  const handleAdvancedFiltersChange = (filters: TenderAdvancedFilters) => {
+    setAdvancedFilters(filters);
+    setPage(1);
+    syncToUrl({ ...serializeFilters(filters), page: 1 });
+  };
+
+  const handleAdvancedFiltersReset = () => {
+    handleAdvancedFiltersChange(emptyTenderAdvancedFilters());
   };
 
   React.useEffect(() => {
@@ -288,41 +349,58 @@ export default function TendersPage() {
               read-only mode, but interactive features are disabled.
             </div>
           ) : null}
-          {!loading && tenders.length === 0 ? (
-            <div className="p-6">
-              <TLEmptyState
-                title="No tenders yet"
-                description="No tenders are available in this organization yet."
+          <TenderAdvancedFiltersPanel
+            filters={advancedFilters}
+            options={filterOptions}
+            onChange={handleAdvancedFiltersChange}
+            onReset={handleAdvancedFiltersReset}
+            leading={
+              <input
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Filter by title or company..."
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-64"
               />
+            }
+            trailing={
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Rows per page</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) =>
+                    handlePageSizeChange(Number(e.target.value))
+                  }
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            }
+          />
+
+          {!loading && tenders.length === 0 ? (
+            <div className="p-12 border-t flex flex-col items-center justify-center bg-muted/5">
+              <TLEmptyState
+                title={search || hasActiveFilters(advancedFilters) ? "No results found" : "No tenders yet"}
+                description={search || hasActiveFilters(advancedFilters) 
+                  ? "No tenders match your current search or filters. Try adjusting them to see more results."
+                  : "No tenders are available in this organization yet."}
+              />
+              {(search || hasActiveFilters(advancedFilters)) && (
+                <TLButton 
+                  variant="outline" 
+                  onClick={handleAdvancedFiltersReset}
+                  className="mt-4"
+                >
+                  Clear all filters
+                </TLButton>
+              )}
             </div>
           ) : (
             <>
-              <div className="border-b px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-2">
-                  <input
-                    value={search}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    placeholder="Filter by title or company..."
-                    className="h-9 w-64 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Rows per page</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) =>
-                      handlePageSizeChange(Number(e.target.value))
-                    }
-                    className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-              </div>
-
+              <div className="pt-8">
               <Table className="table-auto min-w-full">
                 <TableHeader>
                   <TableRow>
@@ -465,6 +543,7 @@ export default function TendersPage() {
                   ) : null}
                 </TableBody>
               </Table>
+              </div>
               <div className="border-t px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-muted-foreground">
                   {totalItems === 0

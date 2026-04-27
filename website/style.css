@@ -573,7 +573,6 @@ ul {
   display: inline-block;
   font-size: 0.78rem;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--tl-primary-400);
   margin-bottom: 0.75rem;

@@ -119,7 +119,7 @@ export function TLTaskEditorDialog(props: {
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
               Title
             </div>
             <Input
@@ -131,7 +131,7 @@ export function TLTaskEditorDialog(props: {
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
               Description
             </div>
             <Textarea
@@ -143,7 +143,7 @@ export function TLTaskEditorDialog(props: {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
                 Due date
               </div>
               <div className="flex items-center gap-2">
@@ -183,7 +183,7 @@ export function TLTaskEditorDialog(props: {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
                 Priority
               </div>
               <div className="flex flex-wrap gap-2">
@@ -199,7 +199,7 @@ export function TLTaskEditorDialog(props: {
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
                 Status
               </div>
               <div className="flex flex-wrap gap-2">
@@ -219,7 +219,7 @@ export function TLTaskEditorDialog(props: {
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
               Tags
             </div>
             <TLTagInput

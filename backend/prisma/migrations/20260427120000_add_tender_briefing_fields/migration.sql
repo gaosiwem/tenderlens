@@ -1,0 +1,5 @@
+ALTER TABLE "Tender"
+  ADD COLUMN IF NOT EXISTS "briefingSession" BOOLEAN,
+  ADD COLUMN IF NOT EXISTS "briefingCompulsory" BOOLEAN,
+  ADD COLUMN IF NOT EXISTS "briefingDateTime" TEXT,
+  ADD COLUMN IF NOT EXISTS "briefingVenue" TEXT;

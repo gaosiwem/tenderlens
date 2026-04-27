@@ -34,7 +34,7 @@ function TenderSelectionCard(props: {
 }) {
   return (
     <div className="space-y-2">
-      <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
         {props.label}
       </div>
       <button

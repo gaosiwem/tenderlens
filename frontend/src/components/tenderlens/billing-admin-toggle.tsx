@@ -34,7 +34,7 @@ export function TLBillingAdminToggle(props: {
     <button
       onClick={toggle}
       disabled={props.disabled || saving}
-      className={`relative group flex items-center gap-2 px-3.5 py-1.5 rounded-xl border transition-all duration-200 text-xs font-bold uppercase tracking-wider h-9 ${
+      className={`relative group flex items-center gap-2 px-3.5 py-1.5 rounded-xl border transition-all duration-200 text-xs font-bold tracking-wider h-9 ${
         props.value
           ? "bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
           : "bg-background border-border hover:border-muted-foreground/30 text-muted-foreground hover:text-foreground"

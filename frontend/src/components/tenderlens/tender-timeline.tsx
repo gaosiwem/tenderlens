@@ -122,7 +122,7 @@ export function TLTenderTimeline(props: { tenderId: string }) {
 
                   <div className="flex items-center justify-between pt-2 border-t border-border/20">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
+                    <span className="text-[10px] text-muted-foreground font-bold tracking-widest">
                       ID:
                     </span>
                     <TLCodeBadge

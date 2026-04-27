@@ -76,7 +76,7 @@ export default function AdminSettingsPage() {
           <Card>
             <CardContent className="p-6 space-y-8">
               <div className="space-y-4">
-                <div className="text-sm font-bold uppercase tracking-wider text-primary/70">
+                <div className="text-sm font-bold tracking-wider text-primary/70">
                   Tender Retention Policy
                 </div>
 

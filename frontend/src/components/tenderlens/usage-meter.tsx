@@ -16,7 +16,7 @@ export function TLUsageMeter(props: { usage: Usage }) {
   return (
     <Card className="tl-surface">
       <CardContent className="p-6 space-y-4">
-        <div className="font-display text-sm font-extrabold uppercase tracking-tight">
+        <div className="font-display text-sm font-extrabold tracking-tight">
           Usage Overview
         </div>
         <div className="text-xs text-muted-foreground">

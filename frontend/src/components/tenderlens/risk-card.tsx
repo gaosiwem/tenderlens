@@ -57,7 +57,7 @@ export function TLRiskCard(props: {
 
         {Array.isArray(signals) && signals.length ? (
           <div className="space-y-2">
-            <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
               Signals
             </div>
             <div className="grid gap-2">

@@ -49,7 +49,7 @@ export function TLUpgradeOfferBanner(props: {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
             </div>
-            <span className="text-[10px] text-primary font-bold uppercase tracking-[0.15em]">
+            <span className="text-[10px] text-primary font-bold tracking-[0.15em]">
               Exclusive offer · Expires in {expiresInHours}h
             </span>
           </div>
@@ -73,7 +73,7 @@ export function TLUpgradeOfferBanner(props: {
           variant="ghost"
           size="sm"
           onClick={() => props.onTrack("dismiss")}
-          className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 px-4"
+          className="text-xs font-bold tracking-widest text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 px-4"
         >
           Maybe later
         </TLButton>

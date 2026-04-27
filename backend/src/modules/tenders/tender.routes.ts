@@ -29,6 +29,7 @@ import {
   deriveDisplayFilename,
   inferTenderLifecycle,
   getTenderOutcomeInsights,
+  getTenderFilterOptions,
 } from "./tender.service"
 import { storage } from "../storage/storage"
 import { enqueueExtractionJob } from "../queue/queue"
@@ -50,6 +51,14 @@ const allowedMime = new Set([
 export const tenderRouter = Router()
 
 type TenderLifecycle = "open" | "awarded" | "closed" | "cancelled"
+
+function parseMultiQuery(value: unknown) {
+  const raw = Array.isArray(value) ? value : value === undefined ? [] : [value]
+  return raw
+    .flatMap((entry) => String(entry).split(","))
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
 
 function inferLifecycleForAccess(args: {
   status: string | null
@@ -112,12 +121,31 @@ tenderRouter.get("/", requireAuth, requireOrgMembership, async (req, res, next) 
       dir,
       includeHistorical: includeHistorical === "true",
       lifecycle,
+      categories: parseMultiQuery(req.query.categories),
+      provinces: parseMultiQuery(req.query.provinces),
+      organsOfState: parseMultiQuery(req.query.organsOfState),
+      tenderNumber: String(req.query.tenderNumber ?? ""),
+      tenderTypes: parseMultiQuery(req.query.tenderTypes),
+      eSubmission: String(req.query.eSubmission ?? ""),
     })
     res.json(ok({ items: out.items, page, pageSize, total: out.total }))
   } catch (e) {
     next(e)
   }
 })
+
+tenderRouter.get(
+  "/filters",
+  requireAuth,
+  requireOrgMembership,
+  async (_req, res, next) => {
+    try {
+      res.json(ok(await getTenderFilterOptions()))
+    } catch (e) {
+      next(e)
+    }
+  },
+)
 
 tenderRouter.get(
   "/:tenderId",

@@ -26,7 +26,7 @@ export function TLInvoiceList(props: { items: OrgInvoice[] }) {
               Invoice History
             </h3>
           </div>
-          <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full uppercase tracking-wider">
+          <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full tracking-wider">
             Latest {props.items.length}
           </span>
         </div>
@@ -54,7 +54,7 @@ export function TLInvoiceList(props: { items: OrgInvoice[] }) {
                       })}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-tight ${
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md tracking-tight ${
                         inv.status === "paid"
                           ? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
                           : "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"

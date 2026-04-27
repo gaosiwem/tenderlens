@@ -1,0 +1,3 @@
+ALTER TABLE "Tender"
+  ADD COLUMN IF NOT EXISTS "tenderType" TEXT,
+  ADD COLUMN IF NOT EXISTS "eSubmission" BOOLEAN;

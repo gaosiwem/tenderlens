@@ -62,19 +62,19 @@ export default function AdminReferralsPage() {
             <table className="min-w-[900px] w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-left p-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground">
+                  <th className="text-left p-4 font-bold tracking-widest text-[10px] text-muted-foreground">
                     Created
                   </th>
-                  <th className="text-left p-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground">
+                  <th className="text-left p-4 font-bold tracking-widest text-[10px] text-muted-foreground">
                     Code
                   </th>
-                  <th className="text-left p-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground">
+                  <th className="text-left p-4 font-bold tracking-widest text-[10px] text-muted-foreground">
                     Billing Ref
                   </th>
-                  <th className="text-left p-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground">
+                  <th className="text-left p-4 font-bold tracking-widest text-[10px] text-muted-foreground">
                     Status
                   </th>
-                  <th className="text-right p-4 font-bold uppercase tracking-widest text-[10px] text-muted-foreground">
+                  <th className="text-right p-4 font-bold tracking-widest text-[10px] text-muted-foreground">
                     Action
                   </th>
                 </tr>
@@ -102,7 +102,7 @@ export default function AdminReferralsPage() {
                     </td>
                     <td className="p-4">
                       <span
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider border ${
                           r.status === "PAID"
                             ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                             : "bg-amber-500/10 text-amber-600 border-amber-500/20"

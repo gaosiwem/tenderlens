@@ -53,7 +53,7 @@ export function TLDashboardSignalsCard(props: {
                   <div className="font-semibold text-foreground">
                     {formatSignalTitle(event)}
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                  <div className="mt-1 flex items-center gap-2 text-xs tracking-[0.16em] text-muted-foreground">
                     <Clock3 className="h-3 w-3" />
                     {new Date(event.createdAt).toLocaleString()}
                   </div>

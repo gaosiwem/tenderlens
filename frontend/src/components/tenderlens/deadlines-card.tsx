@@ -115,7 +115,7 @@ export function TLDeadlinesCard(props: {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="space-y-1.5 p-3 rounded-xl bg-muted/30 border border-border/20">
-            <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
               Closing Date
             </div>
             <div className="text-sm font-semibold text-foreground/90">
@@ -123,7 +123,7 @@ export function TLDeadlinesCard(props: {
             </div>
           </div>
           <div className="space-y-1.5 p-3 rounded-xl bg-muted/30 border border-border/20">
-            <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
               Briefing Session
             </div>
             <div className="text-sm font-semibold text-foreground/90">
@@ -131,7 +131,7 @@ export function TLDeadlinesCard(props: {
             </div>
           </div>
           <div className="space-y-1.5 p-3 rounded-xl bg-muted/30 border border-border/20">
-            <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
               Site Visit
             </div>
             <div className="text-sm font-semibold text-foreground/90">
@@ -142,7 +142,7 @@ export function TLDeadlinesCard(props: {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1.5">
-            <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
               Contact Email
             </div>
             <div className="text-sm font-medium text-foreground/80">
@@ -150,7 +150,7 @@ export function TLDeadlinesCard(props: {
             </div>
           </div>
           <div className="space-y-1.5">
-            <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
               Contact Phone
             </div>
             <div className="text-sm font-medium text-foreground/80">
@@ -161,7 +161,7 @@ export function TLDeadlinesCard(props: {
 
         {enquiryContacts.length > 0 ? (
           <div className="space-y-3 p-3 rounded-xl bg-muted/30 border border-border/20">
-            <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
               Enquiries Contacts
             </div>
             <div className="space-y-2">
@@ -190,7 +190,7 @@ export function TLDeadlinesCard(props: {
 
         <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-border/40">
           <div className="space-y-1.5">
-            <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+            <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
               Extraction Confidence
             </div>
             <div className="flex items-center gap-2">
@@ -205,7 +205,7 @@ export function TLDeadlinesCard(props: {
 
           {cited.length > 0 && (
             <div className="space-y-1.5">
-              <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+              <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                 Sources
               </div>
               <div className="flex flex-wrap gap-1.5">

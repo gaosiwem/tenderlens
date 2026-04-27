@@ -137,7 +137,7 @@ export default function AdminAlertsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                     Name
                   </div>
                   <Input
@@ -148,7 +148,7 @@ export default function AdminAlertsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                     Tender id (optional)
                   </div>
                   <Input
@@ -160,7 +160,7 @@ export default function AdminAlertsPage() {
               </div>
 
               <div className="space-y-2">
-                <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                   Event types
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -182,7 +182,7 @@ export default function AdminAlertsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                     Keywords (optional)
                   </div>
                   <TLTagInput
@@ -196,7 +196,7 @@ export default function AdminAlertsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                     Cooldown minutes
                   </div>
                   <Input
@@ -248,7 +248,7 @@ export default function AdminAlertsPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                        <span className="text-[10px] font-bold text-muted-foreground ">
                           Enabled
                         </span>
                         <Switch
@@ -269,7 +269,7 @@ export default function AdminAlertsPage() {
 
                   <div className="flex flex-wrap gap-4 text-[10px] font-medium text-muted-foreground pt-3 border-t">
                     <div className="flex gap-1.5">
-                      <span className="font-bold uppercase tracking-widest opacity-70">
+                      <span className="font-bold tracking-widest opacity-70">
                         Events:
                       </span>{" "}
                       <span className="text-foreground/80">
@@ -282,7 +282,7 @@ export default function AdminAlertsPage() {
                       </span>
                     </div>
                     <div className="flex gap-1.5 border-l pl-4">
-                      <span className="font-bold uppercase tracking-widest opacity-70">
+                      <span className="font-bold tracking-widest opacity-70">
                         Cooldown:
                       </span>{" "}
                       <span className="text-foreground/80">
@@ -293,7 +293,7 @@ export default function AdminAlertsPage() {
 
                   {r.keywords?.length ? (
                     <div className="flex flex-wrap gap-1.5 items-center">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-70">
+                      <span className="text-[10px] font-bold tracking-widest text-muted-foreground opacity-70">
                         Keywords:
                       </span>
                       {r.keywords.map((k) => (

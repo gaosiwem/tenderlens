@@ -139,7 +139,7 @@ export default function AdminScraperPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-muted/30">
                   <div className="space-y-0.5">
-                    <div className="text-sm font-bold uppercase tracking-wider">
+                    <div className="text-sm font-bold tracking-wider">
                       Scrape Everything
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -156,7 +156,7 @@ export default function AdminScraperPage() {
 
                 <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-muted/30">
                   <div className="space-y-0.5">
-                    <div className="text-sm font-bold uppercase tracking-wider">
+                    <div className="text-sm font-bold tracking-wider">
                       Only New Items
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -174,7 +174,7 @@ export default function AdminScraperPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                     Limit
                   </div>
                   <Input
@@ -195,7 +195,7 @@ export default function AdminScraperPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                     Start Offset
                   </div>
                   <Input
@@ -211,7 +211,7 @@ export default function AdminScraperPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground ">
                     Feed Status
                   </div>
                   <select
@@ -243,7 +243,7 @@ export default function AdminScraperPage() {
 
               {progress ? (
                 <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
-                  <div className="text-xs font-bold uppercase tracking-wider">
+                  <div className="text-xs font-bold tracking-wider">
                     Live Progress
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -262,7 +262,7 @@ export default function AdminScraperPage() {
 
               {progressLog.length > 0 ? (
                 <div className="rounded-xl border border-border bg-background p-3 space-y-1">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <div className="text-[10px] font-bold tracking-widest text-muted-foreground">
                     Activity Log
                   </div>
                   {progressLog.map((line, i) => (

@@ -16,6 +16,10 @@ const publicSans = Public_Sans({
 export const metadata: Metadata = {
   title: "TenderLens - Tender Intelligence Dashboard",
   description: "AI-powered tender intelligence and compliance platform.",
+  icons: {
+    icon: "/Logo.svg",
+    apple: "/Logo.png",
+  },
 };
 
 import { ThemeProvider } from "@/components/theme-provider";

@@ -79,7 +79,7 @@ function WorkspaceMetric(props: {
           {props.icon}
         </div>
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground">
             {props.label}
           </div>
           <div className="mt-1 text-xl font-black tracking-tight text-foreground">
@@ -220,7 +220,7 @@ export default function WorkspacePage() {
             </div>
 
             <div className="rounded-3xl border border-border/60 bg-white/80 p-5 shadow-sm">
-              <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
+              <div className="text-[10px] font-bold tracking-[0.22em] text-muted-foreground">
                 Next workspace to action
               </div>
               <div className="mt-3 text-sm font-semibold text-foreground">
@@ -318,7 +318,7 @@ export default function WorkspacePage() {
                       {String((page - 1) * PAGE_SIZE + index + 1).padStart(2, "0")}
                     </div>
                     <div className="lg:mt-3">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                      <div className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground">
                         Queue position
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">

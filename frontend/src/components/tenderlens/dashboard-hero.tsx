@@ -47,7 +47,7 @@ export function TLDashboardHero(props: {
           </div>
 
           <div className="space-y-3">
-            <div className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="text-sm font-semibold tracking-[0.18em] text-muted-foreground">
               {props.greeting}
             </div>
             <div className="font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
@@ -104,7 +104,7 @@ export function TLDashboardHero(props: {
 function HeroPanel(props: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-border/60 bg-background/75 p-4 backdrop-blur">
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="text-[10px] font-bold tracking-[0.18em] text-muted-foreground">
         {props.label}
       </div>
       <div className="mt-2 font-display text-lg font-extrabold tracking-tight text-foreground">

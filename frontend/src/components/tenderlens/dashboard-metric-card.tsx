@@ -25,7 +25,7 @@ export function TLDashboardMetricCard(props: {
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="text-[11px] font-bold tracking-[0.18em] text-muted-foreground">
               {props.label}
             </div>
             <div className="mt-3 font-display text-3xl font-extrabold tracking-tight">

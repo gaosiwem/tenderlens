@@ -35,7 +35,7 @@ export default function PartnerPage() {
           <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
 
           <div className="relative z-10 space-y-4">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 text-[10px] font-bold uppercase tracking-[0.2em] backdrop-blur-xl border border-white/20 transition-all hover:bg-white/25">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 text-[10px] font-bold tracking-[0.2em] backdrop-blur-xl border border-white/20 transition-all hover:bg-white/25">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
@@ -64,7 +64,7 @@ export default function PartnerPage() {
                   <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
                   <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
                 </div>
-                <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 animate-pulse">
+                <div className="text-xs font-bold tracking-widest text-muted-foreground/60 animate-pulse">
                   Authenticating Partner...
                 </div>
               </div>

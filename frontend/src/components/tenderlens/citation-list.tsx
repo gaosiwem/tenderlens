@@ -7,7 +7,7 @@ export function TLCitationList(props: { items: Citation[] }) {
 
   return (
     <div className="mt-3 space-y-2">
-      <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      <div className="text-xs font-semibold tracking-wide text-muted-foreground ">
         Citations
       </div>
       <div className="flex flex-col gap-2">

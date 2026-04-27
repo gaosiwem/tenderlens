@@ -176,7 +176,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
         <Card>
           <CardContent className="pt-6 space-y-5">
             <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+              <div className="text-sm font-semibold tracking-wide text-primary">
                 {insights?.lifecycleDateLabel ?? "Relevant Date"}
               </div>
               <div className="mt-1 flex items-center gap-2">
@@ -186,7 +186,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                 </div>
               </div>
               {showDatePrecisionNote ? (
-                <div className="mt-1 text-xs text-muted-foreground">
+                <div className="mt-1 text-sm text-muted-foreground">
                   eTenders does not expose a confirmed award date here. This is the
                   date TenderLens detected the award status.
                 </div>
@@ -198,50 +198,50 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                 href={`/tenders/${tender.id}`}
                 className="block rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
-                <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                <div className="text-muted-foreground text-sm tracking-wide">
                   Tender Title
                 </div>
-                <h1 className="text-sm font-bold tracking-tight text-foreground/90 md:text-base break-words">
+                <h1 className="text-base font-bold tracking-tight text-foreground/90 md:text-lg break-words">
                   {tender.title}
                 </h1>
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-base">
               {props.lifecycle === "awarded" && (
                 <div>
-                  <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                  <div className="text-muted-foreground text-sm tracking-wide">
                     Tender Amount
                   </div>
                   <div>{amount}</div>
                 </div>
               )}
               <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                <div className="text-muted-foreground text-sm tracking-wide">
                   Tender Number
                 </div>
                 <div>{scraped?.tenderNumber || "-"}</div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                <div className="text-muted-foreground text-sm tracking-wide">
                   Procuring Entity
                 </div>
                 <div>{scraped?.companyName || "-"}</div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                <div className="text-muted-foreground text-sm tracking-wide">
                   Category
                 </div>
                 <div>{scraped?.category || "-"}</div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                <div className="text-muted-foreground text-sm tracking-wide">
                   Province
                 </div>
                 <div>{scraped?.province || "-"}</div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                <div className="text-muted-foreground text-sm tracking-wide">
                   Closing Date
                 </div>
                 <div>{formatDate(scraped?.closingDate ?? null)}</div>
@@ -257,7 +257,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
             <Card>
               <CardContent className="pt-6 space-y-5">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="text-xs font-semibold tracking-wide text-muted-foreground">
                     Recommended Actions
                   </div>
                   <div className="mt-3 grid gap-3">
@@ -283,7 +283,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <div className="rounded-lg border p-3">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <div className="text-xs tracking-wide text-muted-foreground">
                       Buyer Tenders
                     </div>
                     <div className="mt-1 text-lg font-semibold">
@@ -291,7 +291,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                     </div>
                   </div>
                   <div className="rounded-lg border p-3">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <div className="text-xs tracking-wide text-muted-foreground">
                       Buyer Awarded
                     </div>
                     <div className="mt-1 text-lg font-semibold">
@@ -299,7 +299,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                     </div>
                   </div>
                   <div className="rounded-lg border p-3">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <div className="text-xs tracking-wide text-muted-foreground">
                       Buyer Cancelled
                     </div>
                     <div className="mt-1 text-lg font-semibold">
@@ -307,7 +307,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                     </div>
                   </div>
                   <div className="rounded-lg border p-3">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <div className="text-xs tracking-wide text-muted-foreground">
                       Category Tenders
                     </div>
                     <div className="mt-1 text-lg font-semibold">
@@ -316,7 +316,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                   </div>
                 </div>
 
-                <div className="text-xs text-muted-foreground">
+                <div className="text-sm text-muted-foreground">
                   Outcome intelligence is generated from lifecycle data, buyer/category
                   history, and related tender matching. No automatic AI call runs on
                   page load.
@@ -335,7 +335,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
             <div className="space-y-4">
               <Card>
                 <CardContent className="pt-6">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="text-sm font-semibold tracking-wide text-muted-foreground">
                     Similar Tenders
                   </div>
                   <div className="mt-3 space-y-3">
@@ -348,7 +348,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                         <Link key={item.id} href={relatedHref(item)}>
                           <div className="rounded-lg border p-3 hover:bg-muted/30">
                             <div className="font-medium leading-snug">{item.title}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 text-sm text-muted-foreground">
                               {item.reason} . {item.companyName || "-"} .{" "}
                               {formatDate(item.closingDate)}
                             </div>
@@ -363,7 +363,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
               {(props.lifecycle === "cancelled" || props.lifecycle === "closed") && (
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="text-sm font-semibold tracking-wide text-muted-foreground">
                       Reissue Candidates
                     </div>
                     <div className="mt-3 space-y-3">
@@ -376,7 +376,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                           <Link key={item.id} href={relatedHref(item)}>
                             <div className="rounded-lg border p-3 hover:bg-muted/30">
                               <div className="font-medium leading-snug">{item.title}</div>
-                              <div className="mt-1 text-xs text-muted-foreground">
+                              <div className="mt-1 text-sm text-muted-foreground">
                                 {item.reason} . {item.companyName || "-"}
                               </div>
                             </div>
@@ -421,7 +421,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                       </div>
                       <div className="min-w-0">
                         <div className="font-medium truncate">{doc.name}</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-sm text-muted-foreground">
                           Source: eTenders
                         </div>
                       </div>

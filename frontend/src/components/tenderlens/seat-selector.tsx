@@ -19,7 +19,7 @@ export function TLSeatSelector(props: {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground ">
         <Users className="w-3 h-3" />
         <span>Seats</span>
       </div>

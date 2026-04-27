@@ -31,7 +31,7 @@ export function TLTrialBanner(props: { sub: Subscription }) {
             )}
           </div>
           <div>
-            <div className="font-display text-base font-extrabold uppercase tracking-tight">
+            <div className="font-display text-base font-extrabold tracking-tight">
               {isExpired ? "Trial Expired" : "Trial Active"}
             </div>
             <div className="text-sm text-muted-foreground">

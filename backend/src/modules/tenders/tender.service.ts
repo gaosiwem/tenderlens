@@ -20,6 +20,9 @@ const ETENDERS_DEFAULT_URL =
 type ETenderRow = {
   id: number
   tender_No: string | null
+  tender_Type?: string | null
+  tenderType?: string | null
+  eSubmission?: boolean | string | null
   description: string | null
   category: string | null
   organ_of_State: string | null
@@ -30,6 +33,10 @@ type ETenderRow = {
   canceled_Date?: string | null
   date_Published: string | null
   tenderAmount?: string | null
+  briefingSession?: boolean | null
+  briefingCompulsory?: boolean | null
+  compulsory_briefing_session?: string | null
+  briefingVenue?: string | null
   awards?: Array<{
     tenderAmount?: string | null
   }> | null
@@ -70,6 +77,8 @@ export type ScrapedTenderData = {
   externalId: number | null
   available: boolean
   tenderNumber: string | null
+  tenderType: string | null
+  eSubmission: boolean | null
   description: string | null
   category: string | null
   companyName: string | null
@@ -78,6 +87,10 @@ export type ScrapedTenderData = {
   publishedDate: string | null
   closingDate: string | null
   amount: string | null
+  briefingSession: boolean | null
+  briefingCompulsory: boolean | null
+  briefingDateTime: string | null
+  briefingVenue: string | null
 }
 
 export type TenderLifecycle = "open" | "awarded" | "closed" | "cancelled"
@@ -158,6 +171,11 @@ type ListTenderRow = {
   lifecycleDetectedAt: Date | null
   lifecycleDateSource: string | null
   companyName: string | null
+  category: string | null
+  province: string | null
+  tenderNumber: string | null
+  tenderType: string | null
+  eSubmission: boolean | null
   scrapedStatus: string | null
   amount: string | null
 }
@@ -167,6 +185,8 @@ type TenderScrapedSnapshotRow = {
   externalId: number | null
   available: boolean
   tenderNumber: string | null
+  tenderType: string | null
+  eSubmission: boolean | null
   description: string | null
   category: string | null
   companyName: string | null
@@ -175,6 +195,10 @@ type TenderScrapedSnapshotRow = {
   publishedDate: string | null
   closingDate: string | null
   amount: string | null
+  briefingSession: boolean | null
+  briefingCompulsory: boolean | null
+  briefingDateTime: string | null
+  briefingVenue: string | null
   documents?: unknown
 }
 
@@ -431,6 +455,8 @@ function emptyScrapedData(input?: {
     externalId: input?.externalId ?? null,
     available: false,
     tenderNumber: null,
+    tenderType: null,
+    eSubmission: null,
     description: null,
     category: null,
     companyName: null,
@@ -439,6 +465,10 @@ function emptyScrapedData(input?: {
     publishedDate: null,
     closingDate: null,
     amount: null,
+    briefingSession: null,
+    briefingCompulsory: null,
+    briefingDateTime: null,
+    briefingVenue: null,
   }
 }
 
@@ -660,15 +690,23 @@ function isMissingTenderScrapedColumnsError(error: unknown) {
     message.includes("externalId") ||
     message.includes("scrapedStatus") ||
     message.includes("tenderNumber") ||
+    message.includes("tenderType") ||
+    message.includes("eSubmission") ||
     message.includes("publishedDate") ||
     message.includes("lastScrapedAt") ||
     message.includes("documents") ||
     message.includes("lifecycle") ||
     message.includes("lifecycleDetectedAt") ||
     message.includes("lifecycleDateSource") ||
+    message.includes("briefingSession") ||
+    message.includes("briefingCompulsory") ||
+    message.includes("briefingDateTime") ||
+    message.includes("briefingVenue") ||
     message.includes('column "externalId"') ||
     message.includes('column "available"') ||
     message.includes('column "tenderNumber"') ||
+    message.includes('column "tenderType"') ||
+    message.includes('column "eSubmission"') ||
     message.includes('column "description"') ||
     message.includes('column "category"') ||
     message.includes('column "companyName"') ||
@@ -682,6 +720,10 @@ function isMissingTenderScrapedColumnsError(error: unknown) {
     message.includes('column "lifecycle"') ||
     message.includes('column "lifecycleDetectedAt"') ||
     message.includes('column "lifecycleDateSource"')
+    || message.includes('column "briefingSession"')
+    || message.includes('column "briefingCompulsory"')
+    || message.includes('column "briefingDateTime"')
+    || message.includes('column "briefingVenue"')
   )
 }
 
@@ -725,6 +767,8 @@ async function loadLegacyScrapedSnapshot(
         "externalId",
         "available",
         "tenderNumber",
+        NULL::text AS "tenderType",
+        NULL::boolean AS "eSubmission",
         "description",
         "category",
         "companyName",
@@ -733,6 +777,10 @@ async function loadLegacyScrapedSnapshot(
         "publishedDate",
         "closingDate",
         NULL::text AS "amount",
+        NULL::boolean AS "briefingSession",
+        NULL::boolean AS "briefingCompulsory",
+        NULL::text AS "briefingDateTime",
+        NULL::text AS "briefingVenue",
         "documents"
       FROM ${tableRef}
       WHERE "tenderId" = ${tenderId}
@@ -755,6 +803,8 @@ async function loadTenderScrapedSnapshot(
         "externalId",
         "available",
         "tenderNumber",
+        "tenderType",
+        "eSubmission",
         "description",
         "category",
         "companyName",
@@ -763,6 +813,10 @@ async function loadTenderScrapedSnapshot(
         "publishedDate",
         "closingDate",
         "amount",
+        "briefingSession",
+        "briefingCompulsory",
+        "briefingDateTime",
+        "briefingVenue",
         "documents"
       FROM "Tender"
       WHERE "id" = ${tenderId}
@@ -928,6 +982,8 @@ async function updateTenderScrapedFields(args: {
           "externalId" = ${args.payload.externalId},
           "available" = ${args.payload.available},
           "tenderNumber" = ${args.payload.tenderNumber},
+          "tenderType" = ${args.payload.tenderType},
+          "eSubmission" = ${args.payload.eSubmission},
           "description" = ${args.payload.description},
           "category" = ${args.payload.category},
           "companyName" = ${args.payload.companyName},
@@ -936,6 +992,10 @@ async function updateTenderScrapedFields(args: {
           "publishedDate" = ${args.payload.publishedDate},
           "closingDate" = ${args.payload.closingDate},
           "amount" = ${args.payload.amount},
+          "briefingSession" = ${args.payload.briefingSession},
+          "briefingCompulsory" = ${args.payload.briefingCompulsory},
+          "briefingDateTime" = ${args.payload.briefingDateTime},
+          "briefingVenue" = ${args.payload.briefingVenue},
           "documents" = ${documentsJson}::jsonb,
           "lifecycle" = ${args.payload.lifecycle},
           "lifecycleDetectedAt" = ${lifecyclePayload.lifecycleDetectedAt},
@@ -951,6 +1011,8 @@ async function updateTenderScrapedFields(args: {
           "externalId" = ${args.payload.externalId},
           "available" = ${args.payload.available},
           "tenderNumber" = ${args.payload.tenderNumber},
+          "tenderType" = ${args.payload.tenderType},
+          "eSubmission" = ${args.payload.eSubmission},
           "description" = ${args.payload.description},
           "category" = ${args.payload.category},
           "companyName" = ${args.payload.companyName},
@@ -959,6 +1021,10 @@ async function updateTenderScrapedFields(args: {
           "publishedDate" = ${args.payload.publishedDate},
           "closingDate" = ${args.payload.closingDate},
           "amount" = ${args.payload.amount},
+          "briefingSession" = ${args.payload.briefingSession},
+          "briefingCompulsory" = ${args.payload.briefingCompulsory},
+          "briefingDateTime" = ${args.payload.briefingDateTime},
+          "briefingVenue" = ${args.payload.briefingVenue},
           "documents" = ${documentsJson}::jsonb,
           "lastScrapedAt" = NOW(),
           "updatedAt" = NOW()
@@ -1068,6 +1134,12 @@ async function persistTenderExternalDocuments(args: {
 type TenderSortField = "title" | "status" | "closingDate" | "companyName"
 type TenderSortDirection = "asc" | "desc"
 type TenderLifecycleFilter = TenderLifecycle | "all"
+export type TenderFilterOptions = {
+  categories: string[]
+  provinces: string[]
+  organsOfState: string[]
+  tenderTypes: string[]
+}
 
 function normalizeSortField(value: string | undefined): TenderSortField {
   switch (value) {
@@ -1103,6 +1175,63 @@ function normalizeLifecycle(value: string | undefined): TenderLifecycleFilter {
   }
 }
 
+function normalizeStringList(values: string[] | undefined) {
+  return Array.from(
+    new Set(
+      (values ?? [])
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  )
+}
+
+function normalizeESubmissionFilter(value: string | undefined) {
+  const normalized = (value ?? "").trim().toLowerCase()
+  if (normalized === "accepting") return true
+  if (normalized === "not_accepting") return false
+  return null
+}
+
+function buildTextInFilter(expr: Prisma.Sql, values: string[]) {
+  if (values.length === 0) return Prisma.empty
+  return Prisma.sql`AND LOWER(COALESCE(${expr}, '')) IN (${Prisma.join(
+    values.map((value) => value.toLowerCase()),
+  )})`
+}
+
+function buildAdvancedTenderFilter(args: {
+  categories: string[]
+  provinces: string[]
+  organsOfState: string[]
+  tenderTypes: string[]
+  tenderNumber: string
+  tenderNumberLike: string
+  eSubmission: boolean | null
+  categoryExpr: Prisma.Sql
+  provinceExpr: Prisma.Sql
+  companyExpr: Prisma.Sql
+  tenderNumberExpr: Prisma.Sql
+  tenderTypeExpr: Prisma.Sql
+  eSubmissionExpr: Prisma.Sql
+}) {
+  return Prisma.sql`
+    ${buildTextInFilter(args.categoryExpr, args.categories)}
+    ${buildTextInFilter(args.provinceExpr, args.provinces)}
+    ${buildTextInFilter(args.companyExpr, args.organsOfState)}
+    ${buildTextInFilter(args.tenderTypeExpr, args.tenderTypes)}
+    ${
+      args.tenderNumber
+        ? Prisma.sql`AND LOWER(COALESCE(${args.tenderNumberExpr}, '')) LIKE ${args.tenderNumberLike}`
+        : Prisma.empty
+    }
+    ${
+      args.eSubmission === null
+        ? Prisma.empty
+        : Prisma.sql`AND ${args.eSubmissionExpr} = ${args.eSubmission}`
+    }
+  `
+}
+
 function orderBySql(
   sortField: TenderSortField,
   sortDirection: TenderSortDirection,
@@ -1136,12 +1265,25 @@ export async function listTenders(args: {
   dir?: string
   includeHistorical?: boolean
   lifecycle?: string
+  categories?: string[]
+  provinces?: string[]
+  organsOfState?: string[]
+  tenderNumber?: string
+  tenderTypes?: string[]
+  eSubmission?: string
 }) {
   const skip = (args.page - 1) * args.pageSize
   const sortField = normalizeSortField(args.sort)
   const sortDirection = normalizeSortDirection(args.dir)
   const searchTerm = (args.search ?? "").trim().toLowerCase()
   const searchLike = `%${searchTerm}%`
+  const categories = normalizeStringList(args.categories)
+  const provinces = normalizeStringList(args.provinces)
+  const organsOfState = normalizeStringList(args.organsOfState)
+  const tenderTypes = normalizeStringList(args.tenderTypes)
+  const tenderNumber = (args.tenderNumber ?? "").trim().toLowerCase()
+  const tenderNumberLike = `%${tenderNumber}%`
+  const eSubmission = normalizeESubmissionFilter(args.eSubmission)
   const includeHistorical = args.includeHistorical === true
   const lifecycle = normalizeLifecycle(args.lifecycle)
   const settings = await prisma.systemSettings
@@ -1247,6 +1389,21 @@ export async function listTenders(args: {
           OR LOWER(COALESCE(t."companyName", '')) LIKE ${searchLike}
         )`
       : Prisma.empty
+    const advancedFilter = buildAdvancedTenderFilter({
+      categories,
+      provinces,
+      organsOfState,
+      tenderTypes,
+      tenderNumber,
+      tenderNumberLike,
+      eSubmission,
+      companyExpr: Prisma.sql`t."companyName"`,
+      categoryExpr: Prisma.sql`t."category"`,
+      provinceExpr: Prisma.sql`t."province"`,
+      tenderNumberExpr: Prisma.sql`t."tenderNumber"`,
+      tenderTypeExpr: Prisma.sql`t."tenderType"`,
+      eSubmissionExpr: Prisma.sql`t."eSubmission"`,
+    })
     const orderBy = orderBySql(
       sortField,
       sortDirection,
@@ -1271,6 +1428,11 @@ export async function listTenders(args: {
           t."lifecycleDetectedAt",
           t."lifecycleDateSource",
           t."companyName",
+          t."category",
+          t."province",
+          t."tenderNumber",
+          t."tenderType",
+          t."eSubmission",
           t."scrapedStatus",
           t."amount"
         FROM "Tender" t
@@ -1282,6 +1444,7 @@ export async function listTenders(args: {
         ${closedFilter}
         ${retentionFilter}
         ${searchFilter}
+        ${advancedFilter}
         ${orderBy}
         OFFSET ${skip}
         LIMIT ${args.pageSize}
@@ -1297,6 +1460,7 @@ export async function listTenders(args: {
         ${closedFilter}
         ${retentionFilter}
         ${searchFilter}
+        ${advancedFilter}
       `),
     ])
   } catch (error) {
@@ -1330,6 +1494,15 @@ export async function listTenders(args: {
       const companySelect = table
         ? Prisma.sql`s."companyName"`
         : Prisma.sql`NULL::text AS "companyName"`
+      const categorySelect = table
+        ? Prisma.sql`s."category"`
+        : Prisma.sql`NULL::text AS "category"`
+      const provinceSelect = table
+        ? Prisma.sql`s."province"`
+        : Prisma.sql`NULL::text AS "province"`
+      const tenderNumberSelect = table
+        ? Prisma.sql`s."tenderNumber"`
+        : Prisma.sql`NULL::text AS "tenderNumber"`
       const scrapedStatusSelect = table
         ? Prisma.sql`COALESCE(t."scrapedStatus", s."status") AS "scrapedStatus"`
         : Prisma.sql`t."scrapedStatus"`
@@ -1377,6 +1550,21 @@ export async function listTenders(args: {
             OR LOWER(COALESCE(t."companyName", s."companyName", '')) LIKE ${searchLike}
           )`
         : Prisma.empty
+      const advancedFilter = buildAdvancedTenderFilter({
+        categories,
+        provinces,
+        organsOfState,
+        tenderTypes,
+        tenderNumber,
+        tenderNumberLike,
+        eSubmission,
+        companyExpr: Prisma.sql`COALESCE(t."companyName", s."companyName")`,
+        categoryExpr: Prisma.sql`COALESCE(t."category", s."category")`,
+        provinceExpr: Prisma.sql`COALESCE(t."province", s."province")`,
+        tenderNumberExpr: Prisma.sql`COALESCE(t."tenderNumber", s."tenderNumber")`,
+        tenderTypeExpr: Prisma.sql`NULL::text`,
+        eSubmissionExpr: Prisma.sql`NULL::boolean`,
+      })
       const retentionFilter = applyRetentionFilter
         ? Prisma.sql`AND t."createdAt" >= ${retentionCutoff!}`
         : Prisma.empty
@@ -1404,6 +1592,11 @@ export async function listTenders(args: {
             ${lifecycleDetectedAtSelect},
             ${lifecycleDateSourceSelect},
             ${companySelect},
+            ${categorySelect},
+            ${provinceSelect},
+            ${tenderNumberSelect},
+            NULL::text AS "tenderType",
+            NULL::boolean AS "eSubmission",
             ${scrapedStatusSelect},
             NULL::text AS "amount"
           FROM "Tender" t
@@ -1416,6 +1609,7 @@ export async function listTenders(args: {
           ${closedFilter}
           ${retentionFilter}
           ${searchFilter}
+          ${advancedFilter}
           ${orderBy}
           OFFSET ${skip}
           LIMIT ${args.pageSize}
@@ -1431,6 +1625,7 @@ export async function listTenders(args: {
           ${closedFilter}
           ${retentionFilter}
           ${searchFilter}
+          ${advancedFilter}
         `),
       ])
     } catch {
@@ -1485,6 +1680,21 @@ export async function listTenders(args: {
       const searchFilter = searchTerm
         ? Prisma.sql`AND LOWER(t."title") LIKE ${searchLike}`
         : Prisma.empty
+      const advancedFilter = buildAdvancedTenderFilter({
+        categories,
+        provinces,
+        organsOfState,
+        tenderTypes,
+        tenderNumber,
+        tenderNumberLike,
+        eSubmission,
+        companyExpr: Prisma.sql`NULL::text`,
+        categoryExpr: Prisma.sql`NULL::text`,
+        provinceExpr: Prisma.sql`NULL::text`,
+        tenderNumberExpr: Prisma.sql`NULL::text`,
+        tenderTypeExpr: Prisma.sql`NULL::text`,
+        eSubmissionExpr: Prisma.sql`NULL::boolean`,
+      })
       const retentionFilter = applyRetentionFilter
         ? Prisma.sql`AND t."createdAt" >= ${retentionCutoff!}`
         : Prisma.empty
@@ -1508,7 +1718,15 @@ export async function listTenders(args: {
             t."updatedAt",
             d."closingAt" AS "deadlineClosingAt",
             NULL::text AS "tenderClosingDate",
+            NULL::text AS "lifecycle",
+            NULL::timestamp AS "lifecycleDetectedAt",
+            NULL::text AS "lifecycleDateSource",
             NULL::text AS "companyName",
+            NULL::text AS "category",
+            NULL::text AS "province",
+            NULL::text AS "tenderNumber",
+            NULL::text AS "tenderType",
+            NULL::boolean AS "eSubmission",
             t."scrapedStatus",
             NULL::text AS "amount"
           FROM "Tender" t
@@ -1520,6 +1738,7 @@ export async function listTenders(args: {
           ${closedFilter}
           ${retentionFilter}
           ${searchFilter}
+          ${advancedFilter}
           ${orderBy}
           OFFSET ${skip}
           LIMIT ${args.pageSize}
@@ -1535,6 +1754,7 @@ export async function listTenders(args: {
           ${closedFilter}
           ${retentionFilter}
           ${searchFilter}
+          ${advancedFilter}
         `),
       ])
     }
@@ -1579,12 +1799,50 @@ export async function listTenders(args: {
       updatedAt: row.updatedAt,
       closingDate: displayDate,
       companyName: row.companyName?.trim() || null,
+      category: row.category?.trim() || null,
+      province: row.province?.trim() || null,
+      tenderNumber: row.tenderNumber?.trim() || null,
+      tenderType: row.tenderType?.trim() || null,
+      eSubmission: row.eSubmission,
       amount: row.amount?.trim() || null,
       lifecycle,
     }
   })
 
   return { items, total }
+}
+
+function sortOptionValues(values: Array<string | null>) {
+  return Array.from(
+    new Set(values.map((value) => (value ?? "").trim()).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b))
+}
+
+export async function getTenderFilterOptions(): Promise<TenderFilterOptions> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      category: string | null
+      province: string | null
+      companyName: string | null
+      tenderType: string | null
+    }>
+  >(Prisma.sql`
+    SELECT DISTINCT
+      "category",
+      "province",
+      "companyName",
+      "tenderType"
+    FROM "Tender"
+    WHERE "source" IS DISTINCT FROM ${ORG_PROFILE_TENDER_SOURCE}
+      AND "orgId" IS NULL
+  `)
+
+  return {
+    categories: sortOptionValues(rows.map((row) => row.category)),
+    provinces: sortOptionValues(rows.map((row) => row.province)),
+    organsOfState: sortOptionValues(rows.map((row) => row.companyName)),
+    tenderTypes: sortOptionValues(rows.map((row) => row.tenderType)),
+  }
 }
 
 export async function getTender(args: {
@@ -1866,6 +2124,12 @@ function extractTenderCancelledDate(row: ETenderRow) {
   return null
 }
 
+function extractBriefingDateTime(row: ETenderRow) {
+  const value = (row.compulsory_briefing_session ?? "").trim()
+  if (!value) return null
+  return value
+}
+
 function inferLifecycleDateSourceFromRow(
   row: ETenderRow,
   lifecycle: TenderLifecycle,
@@ -1879,6 +2143,17 @@ function inferLifecycleDateSourceFromRow(
   }
   if (String(row.closing_Date ?? "").trim()) return "closing_date"
   return "unknown"
+}
+
+function normalizeESubmission(value: ETenderRow["eSubmission"]) {
+  if (typeof value === "boolean") return value
+  const normalized = String(value ?? "").trim().toLowerCase()
+  if (!normalized) return null
+  if (["true", "yes", "y", "1", "accepting"].includes(normalized)) return true
+  if (["false", "no", "n", "0", "not accepting"].includes(normalized)) {
+    return false
+  }
+  return null
 }
 
 function mapRowToScrapedPayload(
@@ -1899,6 +2174,9 @@ function mapRowToScrapedPayload(
     externalId: row.id,
     available: true,
     tenderNumber: row.tender_No ?? null,
+    tenderType:
+      (row.tenderType ?? row.tender_Type ?? "").toString().trim() || null,
+    eSubmission: normalizeESubmission(row.eSubmission),
     description: row.description ?? null,
     category: row.category ?? null,
     companyName: row.organ_of_State ?? null,
@@ -1907,6 +2185,14 @@ function mapRowToScrapedPayload(
     publishedDate: row.date_Published ?? null,
     closingDate,
     amount: extractTenderAmount(row),
+    briefingSession:
+      typeof row.briefingSession === "boolean" ? row.briefingSession : null,
+    briefingCompulsory:
+      typeof row.briefingCompulsory === "boolean"
+        ? row.briefingCompulsory
+        : null,
+    briefingDateTime: extractBriefingDateTime(row),
+    briefingVenue: (row.briefingVenue ?? "").trim() || null,
     lifecycle,
     lifecycleDateSource,
     lifecycleDetectedAt:
@@ -2209,6 +2495,8 @@ export async function getScrapedTenderDataForTender(args: {
     externalId: stored.externalId ?? parseETenderIdFromSource(stored.source),
     available: stored.available,
     tenderNumber: stored.tenderNumber,
+    tenderType: stored.tenderType,
+    eSubmission: stored.eSubmission,
     description: stored.description,
     category: stored.category,
     companyName: stored.companyName,
@@ -2217,6 +2505,10 @@ export async function getScrapedTenderDataForTender(args: {
     publishedDate: stored.publishedDate,
     closingDate: stored.closingDate,
     amount: stored.amount,
+    briefingSession: stored.briefingSession,
+    briefingCompulsory: stored.briefingCompulsory,
+    briefingDateTime: stored.briefingDateTime,
+    briefingVenue: stored.briefingVenue,
   }
 }
 
@@ -2683,6 +2975,8 @@ export async function importETenders(args: {
               externalId: scrapedPayload.externalId,
               available: scrapedPayload.available,
               tenderNumber: scrapedPayload.tenderNumber,
+              tenderType: scrapedPayload.tenderType,
+              eSubmission: scrapedPayload.eSubmission,
               scrapedStatus: scrapedPayload.scrapedStatus,
               publishedDate: scrapedPayload.publishedDate,
               documents: scrapedPayload.documents as any,

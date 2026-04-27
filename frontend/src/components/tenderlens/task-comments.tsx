@@ -34,7 +34,7 @@ export function TLTaskComments(props: {
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <MessageSquareIcon size={14} className="text-muted-foreground" />
-        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+        <span className="text-xs font-bold tracking-widest text-muted-foreground">
           Comments
         </span>
       </div>

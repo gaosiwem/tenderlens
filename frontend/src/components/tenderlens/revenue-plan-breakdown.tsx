@@ -39,7 +39,7 @@ export function TLRevenuePlanBreakdown(props: {
 
         <div className="overflow-hidden border border-border/60 rounded-3xl backdrop-blur-sm bg-white/5">
           <table className="min-w-[520px] w-full text-sm">
-            <thead className="bg-muted/40 uppercase">
+            <thead className="bg-muted/40 ">
               <tr className="border-b border-border/60">
                 <th className="text-left p-4 pl-8 text-[10px] font-bold tracking-[0.2em] text-muted-foreground">
                   Product Plan

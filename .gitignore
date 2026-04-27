@@ -45,3 +45,7 @@ Thumbs.db
 scratch/
 tmp/
 
+# Custom Exclusions
+COOLIFY_ENV_PRODUCTION*
+*_env.py
+

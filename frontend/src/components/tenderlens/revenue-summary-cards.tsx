@@ -54,7 +54,7 @@ export function TLRevenueSummaryCards(props: {
           <CardContent className="p-8 relative">
             <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors" />
 
-            <div className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground/60 uppercase mb-4">
+            <div className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground/60 mb-4">
               {c.label}
             </div>
             <div className="font-display text-4xl font-extrabold mt-2 tracking-tight transition-transform group-hover:scale-[1.02] duration-500">
