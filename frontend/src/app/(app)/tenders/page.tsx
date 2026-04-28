@@ -299,6 +299,8 @@ export default function TendersPage() {
   const showAmountColumn = lifecycle === "awarded";
   const showChatColumn =
     (lifecycle === "open" || lifecycle === "all") && !isExpiredReadOnly;
+  const companyColumnLabel =
+    lifecycle === "awarded" ? "Awarded Company" : "Company";
   const getTenderDetailHref = React.useCallback(
     (t: TenderListItem) => {
       // Respect the explicit lifecycle filter from the current page first.
@@ -442,7 +444,7 @@ export default function TendersPage() {
                         onClick={() => handleSort("companyName")}
                         className="inline-flex items-center gap-1.5"
                       >
-                        Company
+                        {companyColumnLabel}
                         <SortIcon field="companyName" />
                       </button>
                     </TableHead>

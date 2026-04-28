@@ -224,7 +224,9 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
               </div>
               <div>
                 <div className="text-muted-foreground text-sm tracking-wide">
-                  Procuring Entity
+                  {props.lifecycle === "awarded"
+                    ? "Awarded Company"
+                    : "Procuring Entity"}
                 </div>
                 <div>{scraped?.companyName || "-"}</div>
               </div>

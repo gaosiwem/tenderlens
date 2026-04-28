@@ -132,6 +132,8 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
     React.useState<TenderAdvancedFilters>(initialAdvancedFilters);
   const [filterOptions, setFilterOptions] =
     React.useState<TenderFilterOptions>(emptyFilterOptions);
+  const companyColumnLabel =
+    lifecycle === "awarded" ? "Awarded Company" : "Company";
 
   const syncToUrl = React.useCallback(
     (updates: Record<string, string | number | null>) => {
@@ -360,7 +362,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
                         onClick={() => handleSort("companyName")}
                         className="inline-flex items-center gap-1.5"
                       >
-                        Company
+                        {companyColumnLabel}
                         <SortIcon field="companyName" />
                       </button>
                     </TableHead>

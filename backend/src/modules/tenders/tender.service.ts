@@ -37,7 +37,13 @@ type ETenderRow = {
   briefingCompulsory?: boolean | null
   compulsory_briefing_session?: string | null
   briefingVenue?: string | null
+  bidders?: string | null
+  company?: Array<{
+    company?: string | null
+    tenderAmount?: string | null
+  }> | null
   awards?: Array<{
+    company?: string | null
     tenderAmount?: string | null
   }> | null
   supportDocument?: Array<{
@@ -2110,6 +2116,37 @@ function extractTenderAmount(row: ETenderRow) {
   return null
 }
 
+function normalizeAwardedCompanyName(value: string | null | undefined) {
+  const normalized = (value ?? "").replace(/\s+/g, " ").trim()
+  return normalized || null
+}
+
+function extractAwardedCompanyName(row: ETenderRow) {
+  const candidates: string[] = []
+
+  if (Array.isArray(row.awards)) {
+    for (const award of row.awards) {
+      const company = normalizeAwardedCompanyName(award?.company)
+      if (company) candidates.push(company)
+    }
+  }
+
+  if (Array.isArray(row.company)) {
+    for (const award of row.company) {
+      const company = normalizeAwardedCompanyName(award?.company)
+      if (company) candidates.push(company)
+    }
+  }
+
+  const bidders = normalizeAwardedCompanyName(row.bidders)
+  if (bidders) candidates.push(bidders)
+
+  const unique = Array.from(
+    new Map(candidates.map((company) => [company.toLowerCase(), company])).values(),
+  )
+  return unique.length > 0 ? unique.join(", ") : null
+}
+
 function extractTenderClosingDate(row: ETenderRow) {
   const closing = (row.closing_Date ?? "").trim()
   if (closing) return closing
@@ -2179,7 +2216,10 @@ function mapRowToScrapedPayload(
     eSubmission: normalizeESubmission(row.eSubmission),
     description: row.description ?? null,
     category: row.category ?? null,
-    companyName: row.organ_of_State ?? null,
+    companyName:
+      lifecycle === "awarded"
+        ? extractAwardedCompanyName(row) ?? row.organ_of_State ?? null
+        : row.organ_of_State ?? null,
     province: row.province ?? null,
     scrapedStatus,
     publishedDate: row.date_Published ?? null,
@@ -2967,7 +3007,7 @@ export async function importETenders(args: {
               source,
               status: TenderStatus.DRAFT,
               description: row.description,
-              companyName: row.organ_of_State,
+              companyName: scrapedPayload.companyName,
               category: row.category,
               province: row.province,
               closingDate: scrapedPayload.closingDate,
@@ -2991,7 +3031,7 @@ export async function importETenders(args: {
               source,
               status: TenderStatus.DRAFT,
               description: row.description,
-              companyName: row.organ_of_State,
+              companyName: scrapedPayload.companyName,
               category: row.category,
               province: row.province,
               closingDate: scrapedPayload.closingDate,
