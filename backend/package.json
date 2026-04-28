@@ -16,6 +16,7 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
+    "backfill:awarded-companies": "node dist/scripts/backfill-awarded-companies.js",
     "db:push": "prisma db push",
     "worker:dev": "tsx watch src/worker.ts",
     "worker:build": "tsc -p tsconfig.json",

@@ -2117,7 +2117,7 @@ function extractTenderAmount(row: ETenderRow) {
 }
 
 function normalizeAwardedCompanyName(value: string | null | undefined) {
-  const normalized = (value ?? "").replace(/\s+/g, " ").trim()
+  const normalized = (value ?? "").replace(/[\s\u00a0]+/g, " ").trim()
   return normalized || null
 }
 
@@ -2142,7 +2142,12 @@ function extractAwardedCompanyName(row: ETenderRow) {
   if (bidders) candidates.push(bidders)
 
   const unique = Array.from(
-    new Map(candidates.map((company) => [company.toLowerCase(), company])).values(),
+    new Map(
+      candidates.map((company) => [
+        company.replace(/[\s\u00a0]+/g, " ").trim().toLowerCase(),
+        company,
+      ]),
+    ).values(),
   )
   return unique.length > 0 ? unique.join(", ") : null
 }
