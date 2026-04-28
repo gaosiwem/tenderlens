@@ -128,6 +128,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
 
   const lifecycleDate = insights?.lifecycleDate ?? null;
   const amount = scraped?.amount ?? tender.amount ?? "-";
+  const companyName = scraped?.companyName ?? tender.companyName ?? "-";
   const showDatePrecisionNote =
     insights?.lifecycle === "awarded" &&
     insights.lifecycleDateSource === "import_detected_at";
@@ -225,10 +226,10 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
               <div>
                 <div className="text-muted-foreground text-sm tracking-wide">
                   {props.lifecycle === "awarded"
-                    ? "Awarded Company"
+                    ? "Awarded To Company"
                     : "Procuring Entity"}
                 </div>
-                <div>{scraped?.companyName || "-"}</div>
+                <div>{companyName}</div>
               </div>
               <div>
                 <div className="text-muted-foreground text-sm tracking-wide">

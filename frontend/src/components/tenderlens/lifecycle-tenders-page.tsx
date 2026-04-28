@@ -133,7 +133,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
   const [filterOptions, setFilterOptions] =
     React.useState<TenderFilterOptions>(emptyFilterOptions);
   const companyColumnLabel =
-    lifecycle === "awarded" ? "Awarded Company" : "Company";
+    lifecycle === "awarded" ? "Awarded To Company" : "Company";
 
   const syncToUrl = React.useCallback(
     (updates: Record<string, string | number | null>) => {

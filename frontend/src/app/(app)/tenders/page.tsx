@@ -300,7 +300,7 @@ export default function TendersPage() {
   const showChatColumn =
     (lifecycle === "open" || lifecycle === "all") && !isExpiredReadOnly;
   const companyColumnLabel =
-    lifecycle === "awarded" ? "Awarded Company" : "Company";
+    lifecycle === "awarded" ? "Awarded To Company" : "Company";
   const getTenderDetailHref = React.useCallback(
     (t: TenderListItem) => {
       // Respect the explicit lifecycle filter from the current page first.
