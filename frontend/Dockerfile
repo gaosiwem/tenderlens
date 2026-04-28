@@ -14,9 +14,11 @@ ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 ARG NEXT_PUBLIC_GA_MEASUREMENT_ID
 ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NPM_CONFIG_OPTIONAL=true
 
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm ci --include=optional
 
 COPY . .
 RUN npm run build
@@ -28,6 +30,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3005
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Automatically leverage standalone output trace
 COPY --from=builder /app/public ./public

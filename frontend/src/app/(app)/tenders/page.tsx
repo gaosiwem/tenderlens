@@ -400,8 +400,8 @@ export default function TendersPage() {
             </div>
           ) : (
             <>
-              <div className="pt-8">
-              <Table className="table-auto min-w-full">
+              <div className="px-4 pt-10 pb-1">
+                <Table className="table-auto min-w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead
@@ -542,7 +542,7 @@ export default function TendersPage() {
                     </TableRow>
                   ) : null}
                 </TableBody>
-              </Table>
+                </Table>
               </div>
               <div className="border-t px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-muted-foreground">
