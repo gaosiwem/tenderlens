@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatDateTime } from "@/lib/date-utils";
 
 const sectionMeta: Record<
   string,
@@ -85,6 +86,15 @@ function isBulletLine(value: string) {
 
 function stripBulletPrefix(value: string) {
   return value.trim().replace(/^(\d+[\.\)]|[-*•])\s+/, "");
+}
+
+function isDateLikeKey(key: string) {
+  return /(^|_)(date|time|at)$|date_time|closing_date/i.test(key);
+}
+
+function formatStructuredValue(key: string, value: unknown) {
+  if (typeof value !== "string" || !isDateLikeKey(key)) return value;
+  return formatDateTime(value);
 }
 
 function renderStringContent(value: string) {
@@ -173,7 +183,7 @@ function renderStructuredValue(value: unknown): React.ReactNode {
             <div className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground">
               {prettifyKey(key)}
             </div>
-            {renderStructuredValue(nestedValue)}
+            {renderStructuredValue(formatStructuredValue(key, nestedValue))}
           </div>
         ))}
       </div>

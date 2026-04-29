@@ -129,6 +129,8 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
   const lifecycleDate = insights?.lifecycleDate ?? null;
   const amount = scraped?.amount ?? tender.amount ?? "-";
   const companyName = scraped?.companyName ?? tender.companyName ?? "-";
+  const procuringEntityName =
+    scraped?.procuringEntityName ?? tender.procuringEntityName ?? "-";
   const showDatePrecisionNote =
     insights?.lifecycle === "awarded" &&
     insights.lifecycleDateSource === "import_detected_at";
@@ -202,7 +204,7 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                 <div className="text-muted-foreground text-sm tracking-wide">
                   Tender Title
                 </div>
-                <h1 className="text-base font-bold tracking-tight text-foreground/90 md:text-lg break-words">
+                <h1 className="text-sm font-medium text-foreground/90 md:text-base break-words">
                   {tender.title}
                 </h1>
               </Link>
@@ -225,12 +227,18 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
               </div>
               <div>
                 <div className="text-muted-foreground text-sm tracking-wide">
-                  {props.lifecycle === "awarded"
-                    ? "Awarded To Company"
-                    : "Procuring Entity"}
+                  Procuring Entity
                 </div>
-                <div>{companyName}</div>
+                <div>{procuringEntityName}</div>
               </div>
+              {props.lifecycle === "awarded" && companyName !== "-" && (
+                <div>
+                  <div className="text-muted-foreground text-sm tracking-wide">
+                    Awarded To
+                  </div>
+                  <div className="font-semibold text-primary">{companyName}</div>
+                </div>
+              )}
               <div>
                 <div className="text-muted-foreground text-sm tracking-wide">
                   Category
@@ -249,7 +257,17 @@ export function LifecycleTenderDetail(props: LifecycleTenderDetailProps) {
                 </div>
                 <div>{formatDate(scraped?.closingDate ?? null)}</div>
               </div>
-            </div>
+              {props.lifecycle === "awarded" && scraped?.bidders && (
+                <div className="sm:col-span-2">
+                  <div className="text-muted-foreground text-sm tracking-wide">
+                    Bidders List
+                  </div>
+                  <div className="whitespace-pre-wrap break-words">{scraped.bidders}</div>
+                </div>
+              )}
+
+              </div>
+
           </CardContent>
         </Card>
       </TLSection>

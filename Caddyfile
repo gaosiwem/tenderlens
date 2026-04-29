@@ -8,6 +8,11 @@
   reverse_proxy frontend:3005
 }
 
+{$MARKETING_DOMAIN}, www.{$MARKETING_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy frontend:3005
+}
+
 {$API_DOMAIN} {
   encode zstd gzip
   reverse_proxy backend:8080

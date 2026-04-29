@@ -38,6 +38,12 @@ type ETenderRow = {
   compulsory_briefing_session?: string | null
   briefingVenue?: string | null
   bidders?: string | null
+  awardedTo?: string | null
+  awarded_To?: string | null
+  awardedCompany?: string | null
+  awarded_Company?: string | null
+  successfulBidder?: string | null
+  successful_Bidder?: string | null
   company?: Array<{
     company?: string | null
     tenderAmount?: string | null
@@ -88,6 +94,7 @@ export type ScrapedTenderData = {
   description: string | null
   category: string | null
   companyName: string | null
+  procuringEntityName: string | null
   province: string | null
   status: string | null
   publishedDate: string | null
@@ -97,6 +104,7 @@ export type ScrapedTenderData = {
   briefingCompulsory: boolean | null
   briefingDateTime: string | null
   briefingVenue: string | null
+  bidders: string | null
 }
 
 export type TenderLifecycle = "open" | "awarded" | "closed" | "cancelled"
@@ -177,6 +185,7 @@ type ListTenderRow = {
   lifecycleDetectedAt: Date | null
   lifecycleDateSource: string | null
   companyName: string | null
+  procuringEntityName: string | null
   category: string | null
   province: string | null
   tenderNumber: string | null
@@ -196,6 +205,7 @@ type TenderScrapedSnapshotRow = {
   description: string | null
   category: string | null
   companyName: string | null
+  procuringEntityName: string | null
   province: string | null
   scrapedStatus: string | null
   publishedDate: string | null
@@ -205,6 +215,7 @@ type TenderScrapedSnapshotRow = {
   briefingCompulsory: boolean | null
   briefingDateTime: string | null
   briefingVenue: string | null
+  bidders: string | null
   documents?: unknown
 }
 
@@ -466,6 +477,7 @@ function emptyScrapedData(input?: {
     description: null,
     category: null,
     companyName: null,
+    procuringEntityName: null,
     province: null,
     status: null,
     publishedDate: null,
@@ -475,6 +487,7 @@ function emptyScrapedData(input?: {
     briefingCompulsory: null,
     briefingDateTime: null,
     briefingVenue: null,
+    bidders: null,
   }
 }
 
@@ -778,6 +791,7 @@ async function loadLegacyScrapedSnapshot(
         "description",
         "category",
         "companyName",
+        NULL::text AS "procuringEntityName",
         "province",
         "status" AS "scrapedStatus",
         "publishedDate",
@@ -787,6 +801,7 @@ async function loadLegacyScrapedSnapshot(
         NULL::boolean AS "briefingCompulsory",
         NULL::text AS "briefingDateTime",
         NULL::text AS "briefingVenue",
+        NULL::text AS "bidders",
         "documents"
       FROM ${tableRef}
       WHERE "tenderId" = ${tenderId}
@@ -814,6 +829,7 @@ async function loadTenderScrapedSnapshot(
         "description",
         "category",
         "companyName",
+        "procuringEntityName",
         "province",
         "scrapedStatus",
         "publishedDate",
@@ -823,6 +839,7 @@ async function loadTenderScrapedSnapshot(
         "briefingCompulsory",
         "briefingDateTime",
         "briefingVenue",
+        "bidders",
         "documents"
       FROM "Tender"
       WHERE "id" = ${tenderId}
@@ -993,7 +1010,9 @@ async function updateTenderScrapedFields(args: {
           "description" = ${args.payload.description},
           "category" = ${args.payload.category},
           "companyName" = ${args.payload.companyName},
+          "procuringEntityName" = ${args.payload.procuringEntityName},
           "province" = ${args.payload.province},
+          "bidders" = ${args.payload.bidders},
           "scrapedStatus" = ${args.payload.scrapedStatus},
           "publishedDate" = ${args.payload.publishedDate},
           "closingDate" = ${args.payload.closingDate},
@@ -1434,6 +1453,7 @@ export async function listTenders(args: {
           t."lifecycleDetectedAt",
           t."lifecycleDateSource",
           t."companyName",
+          t."procuringEntityName",
           t."category",
           t."province",
           t."tenderNumber",
@@ -1805,6 +1825,7 @@ export async function listTenders(args: {
       updatedAt: row.updatedAt,
       closingDate: displayDate,
       companyName: row.companyName?.trim() || null,
+      procuringEntityName: row.procuringEntityName?.trim() || null,
       category: row.category?.trim() || null,
       province: row.province?.trim() || null,
       tenderNumber: row.tenderNumber?.trim() || null,
@@ -2121,35 +2142,57 @@ function normalizeAwardedCompanyName(value: string | null | undefined) {
   return normalized || null
 }
 
-function extractAwardedCompanyName(row: ETenderRow) {
+function awardEntries(value: any) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === "object") return [value]
+  return []
+}
+
+export function extractAwardedCompanyName(row: ETenderRow) {
   const candidates: string[] = []
 
-  if (Array.isArray(row.awards)) {
-    for (const award of row.awards) {
-      const company = normalizeAwardedCompanyName(award?.company)
-      if (company) candidates.push(company)
+  const awardRelated = [
+    ...awardEntries(row.awards).map((a) => a?.company),
+    ...awardEntries(row.company).map((a) => a?.company),
+    row.awardedTo,
+    row.awarded_To,
+    row.awardedCompany,
+    row.awarded_Company,
+    row.successfulBidder,
+    row.successful_Bidder,
+  ]
+
+  for (const value of awardRelated) {
+    const cleaned = (value ?? "").trim()
+    if (!cleaned) continue
+    if (cleaned.includes(",")) {
+      candidates.push(...cleaned.split(",").map((s: string) => s.trim()))
+    } else {
+      candidates.push(cleaned)
     }
   }
 
-  if (Array.isArray(row.company)) {
-    for (const award of row.company) {
-      const company = normalizeAwardedCompanyName(award?.company)
-      if (company) candidates.push(company)
+  if (candidates.length === 0) {
+    const bidders = (row.bidders ?? "").trim()
+    if (bidders) {
+      if (bidders.includes(",")) {
+        candidates.push(...bidders.split(",").map((s: string) => s.trim()))
+      } else {
+        candidates.push(bidders)
+      }
     }
   }
-
-  const bidders = normalizeAwardedCompanyName(row.bidders)
-  if (bidders) candidates.push(bidders)
 
   const unique = Array.from(
     new Map(
-      candidates.map((company) => [
-        company.replace(/[\s\u00a0]+/g, " ").trim().toLowerCase(),
-        company,
-      ]),
+      candidates
+        .map((c) => normalizeAwardedCompanyName(c))
+        .filter((c): c is string => Boolean(c))
+        .map((company) => [company.toLowerCase(), company]),
     ).values(),
   )
-  return unique.length > 0 ? unique.join(", ") : null
+
+  return unique.length > 0 ? unique.sort().join(", ") : null
 }
 
 function extractTenderClosingDate(row: ETenderRow) {
@@ -2221,10 +2264,8 @@ function mapRowToScrapedPayload(
     eSubmission: normalizeESubmission(row.eSubmission),
     description: row.description ?? null,
     category: row.category ?? null,
-    companyName:
-      lifecycle === "awarded"
-        ? extractAwardedCompanyName(row) ?? row.organ_of_State ?? null
-        : row.organ_of_State ?? null,
+    companyName: lifecycle === "awarded" ? extractAwardedCompanyName(row) : null,
+    procuringEntityName: row.organ_of_State ?? null,
     province: row.province ?? null,
     scrapedStatus,
     publishedDate: row.date_Published ?? null,
@@ -2238,6 +2279,7 @@ function mapRowToScrapedPayload(
         : null,
     briefingDateTime: extractBriefingDateTime(row),
     briefingVenue: (row.briefingVenue ?? "").trim() || null,
+    bidders: row.bidders ?? null,
     lifecycle,
     lifecycleDateSource,
     lifecycleDetectedAt:
@@ -2535,6 +2577,11 @@ export async function getScrapedTenderDataForTender(args: {
     })
   }
 
+  const storedLifecycle = inferTenderLifecycle({
+    scrapedStatus: stored.scrapedStatus,
+    closingDate: stored.closingDate,
+  })
+
   return {
     source: inferScrapedSource(stored.source),
     externalId: stored.externalId ?? parseETenderIdFromSource(stored.source),
@@ -2545,6 +2592,9 @@ export async function getScrapedTenderDataForTender(args: {
     description: stored.description,
     category: stored.category,
     companyName: stored.companyName,
+    procuringEntityName:
+      stored.procuringEntityName ??
+      (storedLifecycle === "awarded" ? null : stored.companyName),
     province: stored.province,
     status: stored.scrapedStatus,
     publishedDate: stored.publishedDate,
@@ -2554,6 +2604,7 @@ export async function getScrapedTenderDataForTender(args: {
     briefingCompulsory: stored.briefingCompulsory,
     briefingDateTime: stored.briefingDateTime,
     briefingVenue: stored.briefingVenue,
+    bidders: stored.bidders,
   }
 }
 
@@ -3013,6 +3064,7 @@ export async function importETenders(args: {
               status: TenderStatus.DRAFT,
               description: row.description,
               companyName: scrapedPayload.companyName,
+              procuringEntityName: scrapedPayload.procuringEntityName,
               category: row.category,
               province: row.province,
               closingDate: scrapedPayload.closingDate,
@@ -3022,6 +3074,7 @@ export async function importETenders(args: {
               tenderNumber: scrapedPayload.tenderNumber,
               tenderType: scrapedPayload.tenderType,
               eSubmission: scrapedPayload.eSubmission,
+              bidders: scrapedPayload.bidders,
               scrapedStatus: scrapedPayload.scrapedStatus,
               publishedDate: scrapedPayload.publishedDate,
               documents: scrapedPayload.documents as any,
@@ -3037,8 +3090,10 @@ export async function importETenders(args: {
               status: TenderStatus.DRAFT,
               description: row.description,
               companyName: scrapedPayload.companyName,
+              procuringEntityName: scrapedPayload.procuringEntityName,
               category: row.category,
               province: row.province,
+              bidders: scrapedPayload.bidders,
               closingDate: scrapedPayload.closingDate,
             },
           })

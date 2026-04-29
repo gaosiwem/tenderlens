@@ -12,9 +12,18 @@ type AIProvider = "openai" | "gemini"
 type TenderMetadataRow = {
   description: string | null
   tenderNumber: string | null
+  tenderType: string | null
   category: string | null
   companyName: string | null
+  procuringEntityName: string | null
   closingDate: string | null
+  briefingSession: boolean | null
+  briefingCompulsory: boolean | null
+  briefingDateTime: string | null
+  briefingVenue: string | null
+  amount: string | null
+  bidders: string | null
+  documents: unknown
 }
 
 type ChecklistItemValue = {
@@ -188,9 +197,18 @@ async function loadTenderMetadata(tenderId: string) {
       SELECT
         "description",
         "tenderNumber",
+        "tenderType",
         "category",
         "companyName",
-        "closingDate"
+        "procuringEntityName",
+        "closingDate",
+        "briefingSession",
+        "briefingCompulsory",
+        "briefingDateTime",
+        "briefingVenue",
+        "amount",
+        "bidders",
+        "documents"
       FROM "Tender"
       WHERE "id" = ${tenderId}
       LIMIT 1
@@ -198,6 +216,144 @@ async function loadTenderMetadata(tenderId: string) {
     return rows[0] ?? null
   } catch {
     return null
+  }
+}
+
+function yesNoUnknown(value: boolean | null | undefined) {
+  if (value === true) return "Yes"
+  if (value === false) return "No"
+  return "Not specified"
+}
+
+function readDocumentNames(documents: unknown) {
+  if (!Array.isArray(documents)) return []
+  return documents
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null
+      const record = entry as Record<string, unknown>
+      const name = String(record.name ?? record.fileName ?? record.path ?? "").trim()
+      return name || null
+    })
+    .filter((value): value is string => Boolean(value))
+}
+
+function formatDocumentList(documents: unknown) {
+  const names = readDocumentNames(documents)
+  if (names.length === 0) return "No official document records stored."
+  return names.map((name) => `- ${name}`).join("\n")
+}
+
+function extractRelevantLines(text: string, keywords: string[], limit = 8) {
+  const seen = new Set<string>()
+  const normalizedKeywords = keywords.map((keyword) => keyword.toLowerCase())
+  const lines = text
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line.length >= 12 && line.length <= 260)
+
+  const matches: string[] = []
+  for (const line of lines) {
+    const lower = line.toLowerCase()
+    if (!normalizedKeywords.some((keyword) => lower.includes(keyword))) continue
+    if (seen.has(lower)) continue
+    seen.add(lower)
+    matches.push(line)
+    if (matches.length >= limit) break
+  }
+
+  return matches
+}
+
+function buildTenderFactSheet(args: {
+  title: string
+  metadata: TenderMetadataRow | null
+}) {
+  const m = args.metadata
+  if (!m) return `Tender: ${args.title}`
+
+  return [
+    "Structured tender facts from the eTenders feed:",
+    `Tender: ${args.title}`,
+    `Tender number: ${m.tenderNumber ?? "-"}`,
+    `Tender type: ${m.tenderType ?? "-"}`,
+    `Procuring entity: ${m.procuringEntityName ?? m.companyName ?? "-"}`,
+    `Awarded company / supplier: ${m.companyName ?? "-"}`,
+    `Category: ${m.category ?? "-"}`,
+    `Amount: ${m.amount ?? "-"}`,
+    `Closing date: ${m.closingDate ?? "-"}`,
+    `Briefing session: ${yesNoUnknown(m.briefingSession)}`,
+    `Briefing compulsory: ${yesNoUnknown(m.briefingCompulsory)}`,
+    `Briefing date and time: ${m.briefingDateTime ?? "-"}`,
+    `Briefing venue: ${m.briefingVenue ?? "-"}`,
+    `Bidders: ${m.bidders ?? "-"}`,
+    `Description: ${m.description ?? "-"}`,
+    "Official documents:",
+    formatDocumentList(m.documents),
+  ].join("\n")
+}
+
+function buildDeadlineFacts(args: {
+  title: string
+  metadata: TenderMetadataRow | null
+}) {
+  const m = args.metadata
+  return {
+    tender: args.title,
+    closing_date: m?.closingDate ?? null,
+    briefing_session: yesNoUnknown(m?.briefingSession),
+    briefing_compulsory: yesNoUnknown(m?.briefingCompulsory),
+    briefing_date_time: m?.briefingDateTime ?? null,
+    briefing_venue: m?.briefingVenue ?? null,
+  }
+}
+
+function buildDocumentFacts(args: {
+  title: string
+  metadata: TenderMetadataRow | null
+  context: string
+}) {
+  return {
+    tender: args.title,
+    official_documents: readDocumentNames(args.metadata?.documents),
+    extracted_submission_requirements: extractRelevantLines(args.context, [
+      "document",
+      "documents",
+      "form",
+      "forms",
+      "certificate",
+      "certificates",
+      "proof",
+      "submit",
+      "submission",
+      "returnable",
+      "annexure",
+      "schedule",
+    ]),
+  }
+}
+
+function buildEligibilityFacts(args: { title: string; context: string }) {
+  return {
+    tender: args.title,
+    extracted_requirements: extractRelevantLines(args.context, [
+      "eligibility",
+      "eligible",
+      "cidb",
+      "bbbee",
+      "b-bbee",
+      "b-bbbee",
+      "bee",
+      "csd",
+      "tax",
+      "local content",
+      "functionality",
+      "mandatory",
+      "compulsory",
+      "minimum",
+      "required",
+      "requirement",
+    ]),
   }
 }
 
@@ -230,34 +386,37 @@ async function loadTenderContext(args: {
   fallbackTitle: string
 }) {
   void args.orgId
-  const extract = await prisma.tenderExtract.findFirst({
-    where: { tenderId: args.tenderId },
-    orderBy: { createdAt: "desc" },
-    select: { text: true },
-  })
-  if (extract?.text?.trim()) return extract.text
+  const [metadata, extract, chunks] = await Promise.all([
+    loadTenderMetadata(args.tenderId),
+    prisma.tenderExtract.findFirst({
+      where: { tenderId: args.tenderId },
+      orderBy: { createdAt: "desc" },
+      select: { text: true },
+    }),
+    prisma.tenderChunk.findMany({
+      where: { tenderId: args.tenderId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { content: true },
+    }),
+  ])
 
-  const chunks = await prisma.tenderChunk.findMany({
-    where: { tenderId: args.tenderId },
-    orderBy: { createdAt: "desc" },
-    take: 20,
-    select: { content: true },
-  })
-  if (chunks.length > 0) {
-    return chunks.map((c) => c.content).join("\n\n")
+  const supportingText = [
+    extract?.text?.trim() ?? "",
+    chunks.map((c) => c.content.trim()).filter(Boolean).join("\n\n"),
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+
+  return {
+    metadata,
+    context: [
+      buildTenderFactSheet({ title: args.fallbackTitle, metadata }),
+      supportingText
+        ? `\nExtracted tender document text:\n${supportingText}`
+        : "\nNo extracted tender document text is available yet.",
+    ].join("\n").trim(),
   }
-
-  const scraped = await loadTenderMetadata(args.tenderId)
-  if (!scraped) return ""
-
-  return [
-    `Tender: ${args.fallbackTitle}`,
-    `Description: ${scraped.description ?? "-"}`,
-    `Tender Number: ${scraped.tenderNumber ?? "-"}`,
-    `Category: ${scraped.category ?? "-"}`,
-    `Company: ${scraped.companyName ?? "-"}`,
-    `Closing Date: ${scraped.closingDate ?? "-"}`,
-  ].join("\n")
 }
 
 export async function compareTenders(args: {
@@ -289,7 +448,7 @@ export async function compareTenders(args: {
 
   if (!tA || !tB) throw new AppError("NOT_FOUND", "Tender not found", 404)
 
-  const [textA, textB, businessContext] = await Promise.all([
+  const [contextA, contextB, businessContext] = await Promise.all([
     loadTenderContext({
       orgId: args.orgId,
       tenderId: tA.id,
@@ -317,10 +476,16 @@ Provide a structured comparison highlighting differences in:
 6. Critical missing requirements or gaps the organization must close
 
 Tender A (${tA.title}):
-${textA.slice(0, 6000)}
+${contextA.context.slice(0, 7000)}
 
 Tender B (${tB.title}):
-${textB.slice(0, 6000)}
+${contextB.context.slice(0, 7000)}
+
+Rules:
+- Use the structured tender facts exactly for deadlines, briefing sessions, procuring entities, and official document names.
+- Do not copy Tender A's qualification fit into Tender B. Assess Tender A and Tender B separately.
+- If an eligibility requirement is not present in the extracted text, say that it was not found rather than inventing it.
+- If no organization business document context is available, say that fit cannot be fully assessed and list the tender-side requirements still visible.
 
 Return JSON format: {
   "deadlines": "...",
@@ -338,13 +503,39 @@ Return JSON format: {
     model: env.COMPARE_MODEL,
     maxTokens: env.COMPARE_MAX_TOKENS,
   })
+  const enrichedResult = {
+    ...result,
+    deadlines: {
+      tender_a: buildDeadlineFacts({ title: tA.title, metadata: contextA.metadata }),
+      tender_b: buildDeadlineFacts({ title: tB.title, metadata: contextB.metadata }),
+      ai_notes: result.deadlines ?? null,
+    },
+    eligibility: {
+      tender_a: buildEligibilityFacts({ title: tA.title, context: contextA.context }),
+      tender_b: buildEligibilityFacts({ title: tB.title, context: contextB.context }),
+      ai_notes: result.eligibility ?? null,
+    },
+    documents: {
+      tender_a: buildDocumentFacts({
+        title: tA.title,
+        metadata: contextA.metadata,
+        context: contextA.context,
+      }),
+      tender_b: buildDocumentFacts({
+        title: tB.title,
+        metadata: contextB.metadata,
+        context: contextB.context,
+      }),
+      ai_notes: result.documents ?? null,
+    },
+  }
 
   const comparison = await prisma.tenderComparison.create({
     data: {
       orgId: args.orgId,
       tenderAId: args.tenderAId,
       tenderBId: args.tenderBId,
-      result: result as any,
+      result: enrichedResult as any,
     },
   })
 
@@ -400,7 +591,7 @@ export async function generateBidChecklist(args: {
   })
   if (!tender) throw new AppError("NOT_FOUND", "Tender not found", 404)
 
-  const [text, businessContext] = await Promise.all([
+  const [tenderContext, businessContext] = await Promise.all([
     loadTenderContext({
       orgId: args.orgId,
       tenderId: tender.id,
@@ -412,7 +603,7 @@ export async function generateBidChecklist(args: {
   const prompt = `Generate a comprehensive bid submission checklist for this tender. Focus on mandatory documents, compliance requirements, deadlines, and eligibility match against the organization's business profile.
 
 Tender: ${tender.title}
-Text: ${text.slice(0, 8000)}
+Text: ${tenderContext.context.slice(0, 8000)}
 
 Organization Business Profile (uploaded internal documents):
 ${businessContext.slice(0, 6000) || "No organization business document context provided yet."}

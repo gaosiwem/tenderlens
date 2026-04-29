@@ -8,9 +8,16 @@ type ETenderAward = {
 type ETenderAwardedRow = {
   id: number
   bidders?: string | null
+  organ_of_State?: string | null
   tenderAmount?: string | null
-  company?: ETenderAward[] | null
-  awards?: ETenderAward[] | null
+  awardedTo?: string | null
+  awarded_To?: string | null
+  awardedCompany?: string | null
+  awarded_Company?: string | null
+  successfulBidder?: string | null
+  successful_Bidder?: string | null
+  company?: ETenderAward[] | ETenderAward | null
+  awards?: ETenderAward[] | ETenderAward | null
 }
 
 type ETendersPayload = {
@@ -35,43 +42,69 @@ function normalizeCompany(value: string | null | undefined) {
   return normalized || null
 }
 
+function awardEntries(value: ETenderAwardedRow["awards"] | ETenderAwardedRow["company"]) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === "object") return [value]
+  return []
+}
+
 function extractAwardedCompany(row: ETenderAwardedRow) {
   const candidates: string[] = []
 
-  for (const award of row.awards ?? []) {
-    const company = normalizeCompany(award.company)
-    if (company) candidates.push(company)
+  const awardRelated = [
+    ...awardEntries(row.awards).map((a) => a?.company),
+    ...awardEntries(row.company).map((a) => a?.company),
+    row.awardedTo,
+    row.awarded_To,
+    row.awardedCompany,
+    row.awarded_Company,
+    row.successfulBidder,
+    row.successful_Bidder,
+  ]
+
+  for (const value of awardRelated) {
+    const cleaned = (value ?? "").trim()
+    if (!cleaned) continue
+    if (cleaned.includes(",")) {
+      candidates.push(...cleaned.split(",").map((s) => s.trim()))
+    } else {
+      candidates.push(cleaned)
+    }
   }
 
-  for (const award of row.company ?? []) {
-    const company = normalizeCompany(award.company)
-    if (company) candidates.push(company)
+  if (candidates.length === 0) {
+    const bidders = (row.bidders ?? "").trim()
+    if (bidders) {
+      if (bidders.includes(",")) {
+        candidates.push(...bidders.split(",").map((s) => s.trim()))
+      } else {
+        candidates.push(bidders)
+      }
+    }
   }
-
-  const bidders = normalizeCompany(row.bidders)
-  if (bidders) candidates.push(bidders)
 
   const unique = Array.from(
     new Map(
-      candidates.map((company) => [
-        company.replace(/[\s\u00a0]+/g, " ").trim().toLowerCase(),
-        company,
-      ]),
+      candidates
+        .map((c) => normalizeCompany(c))
+        .filter((c): c is string => Boolean(c))
+        .map((company) => [company.toLowerCase(), company]),
     ).values(),
   )
-  return unique.length > 0 ? unique.join(", ") : null
+
+  return unique.length > 0 ? unique.sort().join(", ") : null
 }
 
 function extractAmount(row: ETenderAwardedRow) {
   const direct = normalizeCompany(row.tenderAmount)
   if (direct) return direct
 
-  for (const award of row.awards ?? []) {
+  for (const award of awardEntries(row.awards)) {
     const amount = normalizeCompany(award.tenderAmount)
     if (amount) return amount
   }
 
-  for (const award of row.company ?? []) {
+  for (const award of awardEntries(row.company)) {
     const amount = normalizeCompany(award.tenderAmount)
     if (amount) return amount
   }
@@ -102,6 +135,7 @@ async function main() {
     for (const row of rows) {
       const companyName = extractAwardedCompany(row)
       if (!companyName) continue
+      const procuringEntityName = normalizeCompany(row.organ_of_State)
       const amount = extractAmount(row)
 
       const result = await prisma.tender.updateMany({
@@ -111,6 +145,8 @@ async function main() {
         },
         data: {
           companyName,
+          bidders: row.bidders ?? null,
+          ...(procuringEntityName ? { procuringEntityName } : {}),
           ...(amount ? { amount } : {}),
           updatedAt: new Date(),
         },

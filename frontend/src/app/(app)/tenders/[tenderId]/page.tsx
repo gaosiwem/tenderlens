@@ -472,7 +472,7 @@ export default function TenderDetailPage() {
                   <div className="text-muted-foreground text-sm tracking-wide">
                     Tender Title
                   </div>
-                  <h1 className="text-base font-bold tracking-tight text-foreground/90 md:text-lg break-words">
+                  <h1 className="text-sm font-medium text-foreground/90 md:text-base break-words">
                     {tender.title}
                   </h1>
                 </div>
@@ -489,8 +489,15 @@ export default function TenderDetailPage() {
                   <div className="text-muted-foreground text-sm tracking-wide">
                     Procuring Entity
                   </div>
-                  <div>{scraped?.companyName || "-"}</div>
+                  <div>
+                    {scraped?.procuringEntityName ||
+                      tender.procuringEntityName ||
+                      scraped?.companyName ||
+                      tender.companyName ||
+                      "-"}
+                  </div>
                 </div>
+
                 <div>
                   <div className="text-muted-foreground text-sm tracking-wide">
                     Category
@@ -517,6 +524,14 @@ export default function TenderDetailPage() {
                     {scraped?.externalId ? String(scraped.externalId) : "-"}
                   </div>
                 </div>
+                {scraped?.bidders && (
+                  <div className="sm:col-span-2">
+                    <div className="text-muted-foreground text-sm tracking-wide">
+                      Bidders List
+                    </div>
+                    <div className="whitespace-pre-wrap break-words">{scraped.bidders}</div>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">

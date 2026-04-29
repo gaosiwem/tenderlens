@@ -29,8 +29,11 @@ export type Tender = {
   briefingCompulsory?: boolean | null;
   briefingDateTime?: string | null;
   briefingVenue?: string | null;
+  bidders?: string | null;
   tenderType?: string | null;
   eSubmission?: boolean | null;
+  companyName?: string | null;
+  procuringEntityName?: string | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -39,6 +42,7 @@ export type Tender = {
 export type TenderListItem = Tender & {
   closingDate: string | null;
   companyName: string | null;
+  procuringEntityName: string | null;
   category: string | null;
   province: string | null;
   tenderNumber: string | null;
@@ -73,6 +77,7 @@ export type ScrapedTenderData = {
   description: string | null;
   category: string | null;
   companyName: string | null;
+  procuringEntityName: string | null;
   province: string | null;
   status: string | null;
   publishedDate: string | null;
@@ -83,6 +88,7 @@ export type ScrapedTenderData = {
   briefingCompulsory: boolean | null;
   briefingDateTime: string | null;
   briefingVenue: string | null;
+  bidders: string | null;
 };
 
 export type TenderFilterOptions = {

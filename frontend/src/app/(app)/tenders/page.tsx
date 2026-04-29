@@ -300,7 +300,8 @@ export default function TendersPage() {
   const showChatColumn =
     (lifecycle === "open" || lifecycle === "all") && !isExpiredReadOnly;
   const companyColumnLabel =
-    lifecycle === "awarded" ? "Awarded To Company" : "Company";
+    lifecycle === "awarded" ? "Awarded To Company" : "Procuring Entity";
+  const showProcuringEntityColumn = lifecycle === "awarded";
   const getTenderDetailHref = React.useCallback(
     (t: TenderListItem) => {
       // Respect the explicit lifecycle filter from the current page first.
@@ -409,7 +410,7 @@ export default function TendersPage() {
                     <TableHead
                       className={
                         showAmountColumn
-                          ? "w-[48%] min-w-[420px]"
+                          ? "w-[34%] min-w-[360px]"
                           : "w-[56%] min-w-[460px]"
                       }
                     >
@@ -435,7 +436,7 @@ export default function TendersPage() {
                     <TableHead
                       className={
                         showAmountColumn
-                          ? "w-[26%] min-w-[300px]"
+                          ? "w-[22%] min-w-[260px]"
                           : "w-[32%] min-w-[320px]"
                       }
                     >
@@ -448,6 +449,11 @@ export default function TendersPage() {
                         <SortIcon field="companyName" />
                       </button>
                     </TableHead>
+                    {showProcuringEntityColumn ? (
+                      <TableHead className="w-[22%] min-w-[260px]">
+                        Procuring Entity
+                      </TableHead>
+                    ) : null}
                     {showAmountColumn ? (
                       <TableHead className="w-[220px] min-w-[220px]">
                         Amount
@@ -473,6 +479,11 @@ export default function TendersPage() {
                           <TableCell>
                             <Skeleton className="h-4 w-24" />
                           </TableCell>
+                          {showAmountColumn ? (
+                            <TableCell>
+                              <Skeleton className="h-4 w-24" />
+                            </TableCell>
+                          ) : null}
                           {showAmountColumn ? (
                             <TableCell>
                               <Skeleton className="h-4 w-20" />
@@ -503,9 +514,18 @@ export default function TendersPage() {
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm whitespace-normal align-top">
                             <span className="block leading-snug wrap-break-word">
-                              {t.companyName || "-"}
+                              {lifecycle === "awarded"
+                                ? t.companyName || "-"
+                                : t.procuringEntityName || t.companyName || "-"}
                             </span>
                           </TableCell>
+                          {showProcuringEntityColumn ? (
+                            <TableCell className="text-muted-foreground text-sm whitespace-normal align-top">
+                              <span className="block leading-snug wrap-break-word">
+                                {t.procuringEntityName || "-"}
+                              </span>
+                            </TableCell>
+                          ) : null}
                           {showAmountColumn ? (
                             <TableCell className="text-muted-foreground text-sm align-top whitespace-normal break-words">
                               {t.amount || "-"}
@@ -535,6 +555,7 @@ export default function TendersPage() {
                         colSpan={
                           3 +
                           (showAmountColumn ? 1 : 0) +
+                          (showProcuringEntityColumn ? 1 : 0) +
                           (showChatColumn ? 1 : 0)
                         }
                         className="py-8 text-center text-muted-foreground"

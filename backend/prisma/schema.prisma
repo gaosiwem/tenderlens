@@ -220,6 +220,7 @@ model Tender {
   description     String?
   category        String?
   companyName     String?
+  procuringEntityName String?
   province        String?
   scrapedStatus   String?
   publishedDate   String?
@@ -229,6 +230,7 @@ model Tender {
   briefingCompulsory Boolean?
   briefingDateTime String?
   briefingVenue   String?
+  bidders         String?
   documents       Json?
   lastScrapedAt   DateTime?
   createdByUserId String

@@ -134,6 +134,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
     React.useState<TenderFilterOptions>(emptyFilterOptions);
   const companyColumnLabel =
     lifecycle === "awarded" ? "Awarded To Company" : "Company";
+  const showProcuringEntityColumn = lifecycle === "awarded";
 
   const syncToUrl = React.useCallback(
     (updates: Record<string, string | number | null>) => {
@@ -336,7 +337,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
                 <Table className="table-auto min-w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className={showAmount ? "w-[48%]" : "w-[56%]"}>
+                    <TableHead className={showAmount ? "w-[38%]" : "w-[56%]"}>
                       <button
                         type="button"
                         onClick={() => handleSort("title")}
@@ -356,7 +357,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
                         <SortIcon field="closingDate" />
                       </button>
                     </TableHead>
-                    <TableHead className={showAmount ? "w-[28%]" : "w-[36%]"}>
+                    <TableHead className={showAmount ? "w-[23%]" : "w-[36%]"}>
                       <button
                         type="button"
                         onClick={() => handleSort("companyName")}
@@ -366,6 +367,9 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
                         <SortIcon field="companyName" />
                       </button>
                     </TableHead>
+                    {showProcuringEntityColumn ? (
+                      <TableHead className="w-[23%]">Procuring Entity</TableHead>
+                    ) : null}
                     {showAmount ? (
                       <TableHead className="w-[220px] min-w-[220px]">Amount</TableHead>
                     ) : null}
@@ -384,6 +388,11 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
                           <TableCell>
                             <Skeleton className="h-4 w-24" />
                           </TableCell>
+                          {showAmount ? (
+                            <TableCell>
+                              <Skeleton className="h-4 w-24" />
+                            </TableCell>
+                          ) : null}
                           {showAmount ? (
                             <TableCell>
                               <Skeleton className="h-4 w-24" />
@@ -423,6 +432,13 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
                               {t.companyName || "-"}
                             </span>
                           </TableCell>
+                          {showProcuringEntityColumn ? (
+                            <TableCell className="text-muted-foreground text-sm whitespace-normal align-top">
+                              <span className="block leading-snug wrap-break-word">
+                                {t.procuringEntityName || "-"}
+                              </span>
+                            </TableCell>
+                          ) : null}
                           {showAmount ? (
                             <TableCell className="text-muted-foreground text-sm whitespace-normal align-top">
                               <span className="block leading-snug wrap-break-word">
@@ -435,7 +451,7 @@ export function LifecycleTendersPage(props: LifecycleTendersPageProps) {
                   {!loading && tenders.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={showAmount ? 4 : 3}
+                        colSpan={showAmount ? 5 : 3}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No tenders match your filters.

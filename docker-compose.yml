@@ -29,16 +29,18 @@ services:
 
   # Backend API
   backend:
+    user: "root"
     build:
       context: ./backend
       dockerfile: Dockerfile
+    command: ["sh", "-c", "npm install && npx prisma generate && npm run dev"]
     env_file:
       - path: .env
         required: false
     environment:
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=development
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
@@ -72,6 +74,8 @@ services:
     expose:
       - "8080"
     volumes:
+      - ./backend:/app
+      - /app/node_modules
       - tenderlens_storage:/app/storage
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -82,19 +86,21 @@ services:
         condition: service_healthy
     restart: always
 
+
   # Background Worker
   worker:
+    user: "root"
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: ["npm", "run", "worker:start"]
+    command: ["sh", "-c", "npm install && npx prisma generate && npm run worker:dev"]
     env_file:
       - path: .env
         required: false
     environment:
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=development
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
@@ -112,9 +118,9 @@ services:
       - PAYFAST_PASSPHRASE=${PAYFAST_PASSPHRASE}
       # Monitoring
       - SENTRY_DSN=${SENTRY_DSN}
-
-
     volumes:
+      - ./backend:/app
+      - /app/node_modules
       - tenderlens_storage:/app/storage
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -125,8 +131,10 @@ services:
         condition: service_healthy
     restart: always
 
+
   # Frontend
   frontend:
+    user: "root"
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -136,10 +144,16 @@ services:
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
         NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID:-}
     environment:
+      - NODE_ENV=development
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
       - NEXT_PUBLIC_GA_MEASUREMENT_ID=${NEXT_PUBLIC_GA_MEASUREMENT_ID:-}
+    command: ["sh", "-c", "rm -rf node_modules/* node_modules/.[!.]* .next/* .next/.[!.]* && npm install --include=dev && npm run dev"]
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     ports:
       - "${FRONTEND_PORT:-3005}:3005"
     expose:

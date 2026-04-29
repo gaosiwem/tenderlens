@@ -52,7 +52,9 @@ function TenderSelectionCard(props: {
               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <Building2 className="size-3.5" />
-                  {props.item.companyName || "Unknown buyer"}
+                  {props.item.procuringEntityName ||
+                    props.item.companyName ||
+                    "Unknown buyer"}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <CalendarDays className="size-3.5" />
@@ -354,7 +356,9 @@ export default function ComparePage() {
                             <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                               <span className="inline-flex items-center gap-1">
                                 <Building2 className="size-3.5" />
-                                {t.companyName || "Unknown buyer"}
+                                {t.procuringEntityName ||
+                                  t.companyName ||
+                                  "Unknown buyer"}
                               </span>
                               <span className="inline-flex items-center gap-1">
                                 <CalendarDays className="size-3.5" />
