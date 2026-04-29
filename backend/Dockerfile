@@ -11,7 +11,9 @@ RUN apk add --no-cache \
 
 COPY package.json package-lock.json* ./
 # Omit --production so we get devDependencies (typescript, etc) for building
-RUN npm install
+RUN npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retries 5 && \
+    npm install
 
 COPY . .
 RUN npx prisma generate

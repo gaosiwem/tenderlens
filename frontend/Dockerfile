@@ -24,7 +24,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NPM_CONFIG_OPTIONAL=true
 
 COPY package.json package-lock.json* ./
-RUN npm ci --include=optional
+RUN npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retries 5 && \
+    npm ci --include=optional
 
 COPY . .
 RUN npm run build
