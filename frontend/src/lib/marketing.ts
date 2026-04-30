@@ -1,12 +1,29 @@
-export const marketingUrl =
-  process.env.NEXT_PUBLIC_MARKETING_URL ??
-  (process.env.NODE_ENV === "development"
-    ? "http://localhost:3005"
-    : "https://tenderlens.co.za");
+function normalizePublicUrl(value: string | undefined, fallback: string) {
+  const raw = value ?? fallback;
+  if (!raw) return raw;
 
-export const appUrl =
-  process.env.NEXT_PUBLIC_APP_URL ??
-  (process.env.NODE_ENV === "development" ? "" : "https://app.tenderlens.co.za");
+  try {
+    const url = new URL(raw);
+    if (process.env.NODE_ENV !== "development" && url.port === "3005") {
+      url.port = "";
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return raw.replace(/\/$/, "");
+  }
+}
+
+export const marketingUrl = normalizePublicUrl(
+  process.env.NEXT_PUBLIC_MARKETING_URL,
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3005"
+    : "https://tenderlens.co.za",
+);
+
+export const appUrl = normalizePublicUrl(
+  process.env.NEXT_PUBLIC_APP_URL,
+  process.env.NODE_ENV === "development" ? "" : "https://app.tenderlens.co.za",
+);
 
 export type BlogArticle = {
   slug: string;
