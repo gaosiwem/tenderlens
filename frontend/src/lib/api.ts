@@ -199,9 +199,31 @@ function isAuthPath(path: string) {
   return path.startsWith("/api/v1/auth/");
 }
 
+function normalizeHostFromPublicUrl(value: string | undefined, fallback: string) {
+  const raw = (value ?? "").trim();
+  if (!raw) return fallback;
+
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    return raw
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/.*$/, "")
+      .replace(/:\d+$/, "")
+      .toLowerCase();
+  }
+}
+
 function shouldRedirectToLogin() {
   if (typeof window === "undefined") return false;
   const currentPath = window.location.pathname || "";
+  const currentHost = window.location.hostname.toLowerCase();
+  const appHost = normalizeHostFromPublicUrl(
+    process.env.NEXT_PUBLIC_APP_URL,
+    currentHost,
+  );
+
+  if (currentHost !== appHost) return false;
   return !currentPath.startsWith("/auth/");
 }
 
