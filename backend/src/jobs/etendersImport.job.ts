@@ -65,6 +65,7 @@ async function runScheduledETendersImport() {
         limit: env.ETENDERS_AUTO_IMPORT_LIMIT,
         start: env.ETENDERS_AUTO_IMPORT_START,
         stopOnExisting: env.ETENDERS_AUTO_IMPORT_STOP_ON_EXISTING,
+        recentWindowHours: env.ETENDERS_AUTO_IMPORT_WINDOW_HOURS,
         timezone: env.ETENDERS_AUTO_IMPORT_TIMEZONE,
         actor: actor.email,
       },
@@ -80,6 +81,7 @@ async function runScheduledETendersImport() {
         start: env.ETENDERS_AUTO_IMPORT_START,
         status,
         stopOnExisting: env.ETENDERS_AUTO_IMPORT_STOP_ON_EXISTING,
+        recentWindowHours: env.ETENDERS_AUTO_IMPORT_WINDOW_HOURS,
       })
 
       logger.info(
@@ -123,6 +125,7 @@ export function scheduleETendersImportJob() {
       statuses: parseStatuses(env.ETENDERS_AUTO_IMPORT_STATUSES),
       limit: env.ETENDERS_AUTO_IMPORT_LIMIT,
       stopOnExisting: env.ETENDERS_AUTO_IMPORT_STOP_ON_EXISTING,
+      recentWindowHours: env.ETENDERS_AUTO_IMPORT_WINDOW_HOURS,
     },
     "Scheduled eTenders import job configured",
   )

@@ -29,6 +29,7 @@ type ETenderRow = {
   status: string | null
   province: string | null
   closing_Date: string | null
+  awardDate?: string | null
   cancelled_Date?: string | null
   canceled_Date?: string | null
   date_Published: string | null
@@ -37,7 +38,7 @@ type ETenderRow = {
   briefingCompulsory?: boolean | null
   compulsory_briefing_session?: string | null
   briefingVenue?: string | null
-  bidders?: string | null
+  bidders?: unknown
   awardedTo?: string | null
   awarded_To?: string | null
   awardedCompany?: string | null
@@ -2150,6 +2151,7 @@ function awardEntries(value: any) {
 
 export function extractAwardedCompanyName(row: ETenderRow) {
   const candidates: string[] = []
+  const normalizedBidders = normalizeBidders(row.bidders)
 
   const awardRelated = [
     ...awardEntries(row.awards).map((a) => a?.company),
@@ -2173,7 +2175,7 @@ export function extractAwardedCompanyName(row: ETenderRow) {
   }
 
   if (candidates.length === 0) {
-    const bidders = (row.bidders ?? "").trim()
+    const bidders = normalizedBidders ?? ""
     if (bidders) {
       if (bidders.includes(",")) {
         candidates.push(...bidders.split(",").map((s: string) => s.trim()))
@@ -2209,6 +2211,13 @@ function extractTenderCancelledDate(row: ETenderRow) {
   return null
 }
 
+function extractTenderAwardDate(row: ETenderRow) {
+  const awarded = (row.awardDate ?? "").trim()
+  if (awarded) return awarded
+
+  return null
+}
+
 function extractBriefingDateTime(row: ETenderRow) {
   const value = (row.compulsory_briefing_session ?? "").trim()
   if (!value) return null
@@ -2238,6 +2247,28 @@ function normalizeESubmission(value: ETenderRow["eSubmission"]) {
   if (["false", "no", "n", "0", "not accepting"].includes(normalized)) {
     return false
   }
+  return null
+}
+
+function normalizeBidders(value: unknown) {
+  if (typeof value === "string") {
+    const normalized = value.trim()
+    return normalized || null
+  }
+
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+      .filter(Boolean)
+    return normalized.length > 0 ? normalized.join(", ") : null
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>
+    const named = typeof record.name === "string" ? record.name.trim() : ""
+    return named || null
+  }
+
   return null
 }
 
@@ -2279,7 +2310,7 @@ function mapRowToScrapedPayload(
         : null,
     briefingDateTime: extractBriefingDateTime(row),
     briefingVenue: (row.briefingVenue ?? "").trim() || null,
-    bidders: row.bidders ?? null,
+    bidders: normalizeBidders(row.bidders),
     lifecycle,
     lifecycleDateSource,
     lifecycleDetectedAt:
@@ -2291,6 +2322,21 @@ function mapRowToScrapedPayload(
             ? parseDateLike(closingDate)
             : null,
     documents: docs,
+  }
+}
+
+function getFeedRowRelevantDate(row: ETenderRow, status: number) {
+  switch (status) {
+    case 1:
+      return parseDateLike(row.date_Published)
+    case 2:
+      return parseDateLike(extractTenderAwardDate(row))
+    case 3:
+      return parseDateLike(row.closing_Date)
+    case 4:
+      return parseDateLike(extractTenderCancelledDate(row) ?? row.date_Published)
+    default:
+      return null
   }
 }
 
@@ -2935,6 +2981,8 @@ export async function importETenders(args: {
   start: number
   status: number
   stopOnExisting?: boolean
+  recentWindowHours?: number
+  referenceNow?: Date
   onProgress?: (progress: ImportETendersProgress) => void | Promise<void>
 }) {
   const startedAtMs = Date.now()
@@ -2942,6 +2990,14 @@ export async function importETenders(args: {
   const targetLimit = isEverything ? 10000 : Math.max(args.limit, 1)
   const stopOnExisting = args.stopOnExisting ?? true
   const supportsInlineScrapedColumns = await hasTenderScrapedColumns()
+  const referenceNow = args.referenceNow ?? new Date()
+  const recentWindowHours =
+    typeof args.recentWindowHours === "number" && args.recentWindowHours > 0
+      ? args.recentWindowHours
+      : null
+  const recentCutoff = recentWindowHours
+    ? new Date(referenceNow.getTime() - recentWindowHours * 60 * 60 * 1000)
+    : null
 
   let currentStart = args.start
   let totalImported = 0
@@ -2977,14 +3033,41 @@ export async function importETenders(args: {
       .map((row) => {
         const title = (row.description ?? row.tender_No ?? "").trim()
         const source = `etenders:${row.id}:${row.tender_No ?? "unknown"}`
-        return { row, title, source }
+        return {
+          row,
+          title,
+          source,
+          relevantDate: getFeedRowRelevantDate(row, args.status),
+        }
       })
       .filter((x) => Boolean(x.source))
 
+    const freshEntries = recentCutoff
+      ? normalized.filter((entry) => {
+          if (!entry.relevantDate) return false
+          return entry.relevantDate.getTime() >= recentCutoff.getTime()
+        })
+      : normalized
+
+    const hasOnlyOlderRowsInBatch =
+      Boolean(recentCutoff) &&
+      normalized.length > 0 &&
+      freshEntries.length === 0 &&
+      normalized.some(
+        (entry) =>
+          entry.relevantDate &&
+          entry.relevantDate.getTime() < recentCutoff!.getTime(),
+      )
+
+    if (hasOnlyOlderRowsInBatch) {
+      stopTriggered = true
+      break
+    }
+
     const existingRows =
-      normalized.length > 0
+      freshEntries.length > 0
         ? await prisma.tender.findMany({
-            where: { source: { in: normalized.map((x) => x.source) } },
+            where: { source: { in: freshEntries.map((x) => x.source) } },
             select: { id: true, source: true },
           })
         : []
@@ -2994,7 +3077,7 @@ export async function importETenders(args: {
         .filter((entry): entry is [string, string] => Boolean(entry[0])),
     )
 
-    for (const entry of normalized) {
+    for (const entry of freshEntries) {
       if (!isEverything && totalImported + totalSkipped >= targetLimit) break
 
       const row = entry.row
