@@ -370,6 +370,25 @@ export const env = {
     "SOCKET_CORS_ORIGIN",
   ),
 
+  ETENDERS_AUTO_IMPORT_ENABLED:
+    (process.env.ETENDERS_AUTO_IMPORT_ENABLED ?? "true") === "true",
+  ETENDERS_AUTO_IMPORT_CRON:
+    process.env.ETENDERS_AUTO_IMPORT_CRON ?? "0 0 * * *",
+  ETENDERS_AUTO_IMPORT_TIMEZONE:
+    process.env.ETENDERS_AUTO_IMPORT_TIMEZONE ?? "Africa/Johannesburg",
+  ETENDERS_AUTO_IMPORT_STATUSES:
+    process.env.ETENDERS_AUTO_IMPORT_STATUSES ?? "1,2,3,4",
+  ETENDERS_AUTO_IMPORT_LIMIT: Number(
+    process.env.ETENDERS_AUTO_IMPORT_LIMIT ?? "250",
+  ),
+  ETENDERS_AUTO_IMPORT_START: Number(
+    process.env.ETENDERS_AUTO_IMPORT_START ?? "0",
+  ),
+  ETENDERS_AUTO_IMPORT_STOP_ON_EXISTING:
+    (process.env.ETENDERS_AUTO_IMPORT_STOP_ON_EXISTING ?? "false") === "true",
+  ETENDERS_AUTO_IMPORT_USER_EMAIL:
+    process.env.ETENDERS_AUTO_IMPORT_USER_EMAIL ?? "system+etenders-import@tenderlens.local",
+
   // Sprint 10
   ATTACHMENTS_ENABLED: (process.env.ATTACHMENTS_ENABLED ?? "true") === "true",
   ATTACHMENTS_MAX_MB: Number(process.env.ATTACHMENTS_MAX_MB ?? "25"),

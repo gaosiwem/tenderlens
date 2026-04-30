@@ -11,6 +11,7 @@ import { scheduleRevenueSprint3Jobs } from "./jobs/revenueSprint3.job"
 import { scheduleRevenueSprint4Jobs } from "./jobs/revenueSprint4.job"
 import { scheduleRevenueSprint5Jobs } from "./jobs/revenueSprint5.job"
 import { scheduleBusinessSupportJobs } from "./jobs/businessSupport.job"
+import { scheduleETendersImportJob } from "./jobs/etendersImport.job"
 
 initSentry("api")
 registerSentryProcessHandlers("api")
@@ -28,4 +29,5 @@ server.listen(env.PORT, () => {
   scheduleRevenueSprint4Jobs()
   scheduleRevenueSprint5Jobs()
   scheduleBusinessSupportJobs()
+  scheduleETendersImportJob()
 })

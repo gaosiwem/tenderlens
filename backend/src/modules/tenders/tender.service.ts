@@ -919,7 +919,7 @@ async function loadTenderLifecycleState(
 }
 
 async function maybeLogLifecycleChange(args: {
-  orgId?: string
+  orgId?: string | null
   tenderId: string
   previous: {
     lifecycle: TenderLifecycle
@@ -970,7 +970,7 @@ async function maybeLogLifecycleChange(args: {
 
 async function updateTenderScrapedFields(args: {
   tenderId: string
-  orgId?: string
+  orgId?: string | null
   payload: ReturnType<typeof mapRowToScrapedPayload>
 }) {
   const previousScrapedSnapshot = await loadTenderScrapedSnapshot(args.tenderId)
@@ -2929,7 +2929,7 @@ export async function getTenderOutcomeInsights(args: {
 }
 
 export async function importETenders(args: {
-  orgId: string
+  orgId?: string | null
   userId: string
   limit: number
   start: number
