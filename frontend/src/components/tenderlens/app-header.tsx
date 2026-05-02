@@ -92,7 +92,7 @@ export function TenderLensAppHeader(props: {
             <div className="flex items-center gap-2 mr-2">{props.actions}</div>
           )}
 
-          <div className="hidden sm:block">
+          <div className="block">
             <ModeToggle />
           </div>
 
