@@ -85,6 +85,8 @@ model Organization {
   mentions           Mention[]
   billingEvents      BillingEvent[]
   invoices           OrgInvoice[]
+  payfastCheckouts   PayFastCheckout[]
+  payfastNotifications PayFastNotification[]
   
   // Revenue Sprint 3
   invites             OrgInvite[]
@@ -904,6 +906,11 @@ model OrgSubscription {
   pastDueSince     DateTime?
   graceEndsAt      DateTime?
 
+  paymentGateway   String?
+  billingReference String?
+  payfastToken     String?
+  lastPaymentAt    DateTime?
+
   experimentBucket String?
 
   createdAt DateTime @default(now())
@@ -913,6 +920,53 @@ model OrgSubscription {
 
   @@index([plan])
   @@index([status])
+}
+
+model PayFastCheckout {
+  id               String    @id @default(uuid())
+  orgId            String
+  userId           String?
+  reference        String    @unique
+  plan             PlanType
+  amountCents      Int
+  currency         String    @default("ZAR")
+  status           String    @default("PENDING")
+  mode             String
+  paymentUrl       String?
+  payfastPaymentId String?   @unique
+  payfastToken     String?
+  rawPayload       Json?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PayFastNotification {
+  id               String   @id @default(uuid())
+  orgId            String?
+  reference        String?
+  payfastPaymentId String?
+  paymentStatus    String?
+  validationStatus String   @default("RECEIVED")
+  rawPayload       Json
+  error            String?
+  createdAt        DateTime @default(now())
+  processedAt      DateTime?
+
+  org Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([reference])
+  @@index([payfastPaymentId])
+  @@index([validationStatus])
+  @@index([createdAt])
 }
 
 model BillingEvent {

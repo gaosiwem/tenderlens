@@ -143,14 +143,12 @@ export function buildPayFastCheckout(args: PayFastCheckoutArgs) {
 
   return {
     paymentUrl: getProcessUrl(),
-    fields: env.PAYFAST_SANDBOX
-      ? fields
-      : {
-          ...fields,
-          signature: createSignatureFromEntries(
-            Object.entries(fields).map(([key, value]) => [key, String(value)]),
-          ),
-        },
+    fields: {
+      ...fields,
+      signature: createSignatureFromEntries(
+        Object.entries(fields).map(([key, value]) => [key, String(value)]),
+      ),
+    },
   }
 }
 

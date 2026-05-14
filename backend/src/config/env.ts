@@ -172,6 +172,11 @@ export const env = {
   PAYFAST_NOTIFY_URL:
     process.env.PAYFAST_NOTIFY_URL ??
     `${process.env.BACKEND_PUBLIC_URL || "http://127.0.0.1:8080"}/api/v1/billing/payfast/notify`,
+  PAYFAST_RECONCILIATION_ENABLED:
+    (process.env.PAYFAST_RECONCILIATION_ENABLED ?? "true") === "true",
+  PAYFAST_RECONCILIATION_CRON:
+    process.env.PAYFAST_RECONCILIATION_CRON ?? "15 * * * *",
+  PAYFAST_GRACE_DAYS: Number(process.env.PAYFAST_GRACE_DAYS ?? "7"),
   DEV_TEST_ROUTES_ENABLED:
     (process.env.DEV_TEST_ROUTES_ENABLED ?? "false") === "true",
   PAYOUT_WEBHOOK_SECRET: process.env.PAYOUT_WEBHOOK_SECRET ?? "",
@@ -463,6 +468,7 @@ if (env.NODE_ENV === "production") {
     "DATABASE_URL",
     "PAYFAST_MERCHANT_ID",
     "PAYFAST_MERCHANT_KEY",
+    "PAYFAST_PASSPHRASE",
     "SMTP_PASS",
   ]
 

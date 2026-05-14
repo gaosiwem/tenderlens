@@ -29,18 +29,12 @@ export async function startPlanCheckout(
   promoCode?: string,
 ) {
   return apiFetch<{
-    gateway: "PAYFAST" | "PAYFAST_SANDBOX_LOCAL";
+    gateway: "PAYFAST";
     paymentUrl: string;
     fields: Record<string, string>;
     reference: string;
   }>("/api/v1/billing/plan-checkout", {
     method: "POST",
     body: JSON.stringify({ plan, quantity, promoCode }),
-  });
-}
-
-export async function completeSandboxCheckout() {
-  return apiFetch<{ completed: true }>("/api/v1/billing/payfast/dev-complete-latest", {
-    method: "POST",
   });
 }

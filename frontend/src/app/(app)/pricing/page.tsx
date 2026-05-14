@@ -2,17 +2,15 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { TenderLensAppShell } from "@/components/tenderlens/app-shell";
 import { TLSection } from "@/components/tenderlens/section";
 import { TLPlanCard } from "@/components/tenderlens/plan-card";
-import { completeSandboxCheckout, startPlanCheckout } from "@/lib/billing.api";
+import { startPlanCheckout } from "@/lib/billing.api";
 import { useBilling } from "@/hooks/use-billing";
 import { trackBillingEvent } from "@/lib/billing-analytics.api";
 import { formatPlanDisplayName } from "@/lib/billing.types";
 
 export default function PricingPage() {
-  const router = useRouter();
   const { subscription } = useBilling();
   const [loading, setLoading] = React.useState<string | null>(null);
   const currentPlan = subscription?.plan ?? "TRIAL";
@@ -86,16 +84,6 @@ export default function PricingPage() {
 
     if (!res.ok) {
       toast.error("Checkout failed", { description: res.error.message });
-      return;
-    }
-
-    if (res.data.gateway === "PAYFAST_SANDBOX_LOCAL") {
-      const completed = await completeSandboxCheckout();
-      if (!completed.ok) {
-        toast.error("Checkout failed", { description: completed.error.message });
-        return;
-      }
-      router.push("/billing/success");
       return;
     }
 

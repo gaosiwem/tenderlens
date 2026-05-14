@@ -20,7 +20,7 @@ import {
   verifyPayFastSignature,
 } from "../../billing/payfast.service"
 import { logger } from "../../utils/logger"
-import { SubscriptionStatus } from "@prisma/client"
+import { PlanType, SubscriptionStatus } from "@prisma/client"
 import { env } from "../../config/env"
 
 export const billingRouter = Router()
@@ -29,8 +29,16 @@ function toClientPlan(plan: string) {
   return plan === "ENTERPRISE" ? "BUSINESS" : plan
 }
 
-function mapClientPlanToSubscriptionPlan(plan: "PRO" | "BUSINESS") {
+function mapClientPlanToSubscriptionPlan(plan: "PRO" | "BUSINESS"): PlanType {
   return plan === "BUSINESS" ? "ENTERPRISE" : "PRO"
+}
+
+function mapPayloadPlanToClientPlan(value: string | null | undefined) {
+  return value === "BUSINESS" ? "BUSINESS" : "PRO"
+}
+
+function mapPayloadPlanToPlanType(value: string | null | undefined): PlanType {
+  return mapClientPlanToSubscriptionPlan(mapPayloadPlanToClientPlan(value))
 }
 
 function splitName(name: string | null | undefined) {
@@ -55,6 +63,28 @@ function parsePayFastAmountToCents(value: string | null | undefined) {
   return Math.round(amount * 100)
 }
 
+function extractPayFastToken(payload: Record<string, string>) {
+  return (
+    payload.token ||
+    payload.subscription_token ||
+    payload.pf_token ||
+    payload.custom_str5 ||
+    null
+  )
+}
+
+function normalizePayFastStatus(value: string | null | undefined) {
+  return String(value ?? "").trim().toUpperCase()
+}
+
+function isCanceledPayFastStatus(status: string) {
+  return ["CANCELLED", "CANCELED", "SUBSCRIPTION CANCELLED"].includes(status)
+}
+
+function isFailedPayFastStatus(status: string) {
+  return ["FAILED", "DECLINED", "EXPIRED"].includes(status)
+}
+
 async function activatePayFastSubscription(args: {
   orgId: string
   userId?: string
@@ -64,6 +94,7 @@ async function activatePayFastSubscription(args: {
   amountCents: number | null
   paymentStatus: string
   rawStatus?: string | null
+  payfastToken?: string | null
 }) {
   const existing = await prisma.orgSubscription.findUnique({
     where: { orgId: args.orgId },
@@ -83,6 +114,10 @@ async function activatePayFastSubscription(args: {
       currentPeriodEnd: addOneMonth(baseDate),
       seatsPurchased: existing?.seatsPurchased ?? 1,
       seatsUsed: 0,
+      paymentGateway: "PAYFAST",
+      billingReference: args.payfastToken ?? args.paymentId ?? args.reference,
+      payfastToken: args.payfastToken ?? undefined,
+      lastPaymentAt: new Date(),
     },
     update: {
       plan: mapClientPlanToSubscriptionPlan(args.plan),
@@ -91,6 +126,10 @@ async function activatePayFastSubscription(args: {
       pastDueSince: null,
       graceEndsAt: null,
       trialEndsAt: null,
+      paymentGateway: "PAYFAST",
+      billingReference: args.payfastToken ?? args.paymentId ?? args.reference,
+      payfastToken: args.payfastToken ?? undefined,
+      lastPaymentAt: new Date(),
     },
   })
 
@@ -106,6 +145,7 @@ async function activatePayFastSubscription(args: {
       paymentStatus: args.paymentStatus,
       amountCents: args.amountCents,
       rawStatus: args.rawStatus ?? null,
+      payfastToken: args.payfastToken ?? null,
     },
   })
 }
@@ -226,47 +266,10 @@ billingRouter.post(
           ? PLAN_CONFIG.PRO.monthlyPriceCents
           : PLAN_CONFIG.ENTERPRISE.monthlyPriceCents
       const frontendOrigin = resolveFrontendOrigin(req)
-
-      if (env.PAYFAST_SANDBOX && env.NODE_ENV !== "production") {
-        await trackBillingEvent({
-          orgId: req.orgId!,
-          userId: req.auth!.userId,
-          name: "checkout_started",
-          meta: {
-            plan,
-            quantity,
-            gateway: "PAYFAST",
-            reference,
-            amountCents,
-            mode: "sandbox_local",
-          },
-        })
-
-        await auditLog({
-          req,
-          action: "BILLING_CHECKOUT_STARTED",
-          orgId: req.orgId!,
-          userId: req.auth!.userId,
-          entityType: "OrgSubscription",
-          entityId: req.orgId!,
-          meta: {
-            plan,
-            gateway: "PAYFAST_SANDBOX_LOCAL",
-            reference,
-            amountCents,
-          },
-        })
-
-        res.json(
-          ok({
-            gateway: "PAYFAST_SANDBOX_LOCAL",
-            paymentUrl: `${frontendOrigin}/billing/success`,
-            fields: {},
-            reference,
-          }),
-        )
-        return
-      }
+      const returnUrlParams = new URLSearchParams({
+        checkout: reference,
+        plan,
+      })
 
       const checkout = buildPayFastCheckout({
         orgId: req.orgId!,
@@ -278,8 +281,20 @@ billingRouter.post(
         lastName,
         reference,
         orgName: org.name,
-        returnUrl: `${frontendOrigin}/billing/success`,
+        returnUrl: `${frontendOrigin}/billing/success?${returnUrlParams.toString()}`,
         cancelUrl: `${frontendOrigin}/billing/cancel`,
+      })
+
+      await prisma.payFastCheckout.create({
+        data: {
+          orgId: req.orgId!,
+          userId: req.auth!.userId,
+          reference,
+          plan: mapClientPlanToSubscriptionPlan(plan),
+          amountCents,
+          mode: env.PAYFAST_SANDBOX ? "SANDBOX" : "PRODUCTION",
+          paymentUrl: checkout.paymentUrl,
+        },
       })
 
       await trackBillingEvent({
@@ -346,17 +361,41 @@ billingRouter.post(
     const payload = parsePayFastNotifyPayload(req.body)
     const reference = payload.m_payment_id ?? null
     const paymentId = payload.pf_payment_id ?? null
-    const plan = payload.custom_str1 === "BUSINESS" ? "BUSINESS" : "PRO"
+    const plan = mapPayloadPlanToClientPlan(payload.custom_str1)
     const orgId = payload.custom_str2 ?? null
     const userId = payload.custom_str3 ?? undefined
-    const status = String(payload.payment_status ?? "").toUpperCase()
+    const status = normalizePayFastStatus(payload.payment_status)
+    const payfastToken = extractPayFastToken(payload)
+    const notificationOrg = orgId
+      ? await prisma.organization.findUnique({
+          where: { id: orgId },
+          select: { id: true },
+        })
+      : null
+    const notification = await prisma.payFastNotification.create({
+      data: {
+        orgId: notificationOrg?.id ?? null,
+        reference,
+        payfastPaymentId: paymentId,
+        paymentStatus: status || null,
+        rawPayload: payload,
+      },
+    })
 
     try {
       if (!verifyPayFastSignature(payload)) {
         logger.warn({ reference, paymentId }, "payfast_invalid_signature")
-        if (orgId) {
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "INVALID_SIGNATURE",
+            error: "PayFast signature did not match.",
+            processedAt: new Date(),
+          },
+        })
+        if (notificationOrg) {
           await trackBillingEvent({
-            orgId,
+            orgId: notificationOrg.id,
             userId,
             name: "checkout_failed",
             meta: {
@@ -373,9 +412,17 @@ billingRouter.post(
       const validWithGateway = await verifyPayFastPaymentWithGateway(payload)
       if (!validWithGateway) {
         logger.warn({ reference, paymentId }, "payfast_gateway_validation_failed")
-        if (orgId) {
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "GATEWAY_INVALID",
+            error: "PayFast gateway validation returned invalid.",
+            processedAt: new Date(),
+          },
+        })
+        if (notificationOrg) {
           await trackBillingEvent({
-            orgId,
+            orgId: notificationOrg.id,
             userId,
             name: "checkout_failed",
             meta: {
@@ -389,7 +436,71 @@ billingRouter.post(
         return res.status(400).send("INVALID")
       }
 
-      if (!orgId) {
+      if (!orgId || !notificationOrg) {
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "INVALID_PAYLOAD",
+            error: !orgId
+              ? "Missing organization id."
+              : "Organization id was not found.",
+            processedAt: new Date(),
+          },
+        })
+        return res.status(400).send("INVALID")
+      }
+
+      const checkout = reference
+        ? await prisma.payFastCheckout.findUnique({
+            where: { reference },
+          })
+        : null
+
+      const isInitialCheckout = Boolean(checkout)
+      const existingPayFastSubscription = await prisma.orgSubscription.findUnique({
+        where: { orgId },
+        select: { paymentGateway: true, payfastToken: true },
+      })
+      const knownRecurringSubscription =
+        existingPayFastSubscription?.paymentGateway === "PAYFAST" &&
+        (!payfastToken || existingPayFastSubscription.payfastToken === payfastToken)
+
+      if (!checkout && !knownRecurringSubscription) {
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "UNKNOWN_REFERENCE",
+            error: "No matching checkout or PayFast subscription was found.",
+            processedAt: new Date(),
+          },
+        })
+        logger.warn({ reference, paymentId, orgId }, "payfast_unknown_reference")
+        return res.status(400).send("INVALID")
+      }
+
+      if (checkout && checkout.orgId !== orgId) {
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "REFERENCE_MISMATCH",
+            error: "PayFast reference does not belong to callback organization.",
+            processedAt: new Date(),
+          },
+        })
+        logger.warn({ reference, paymentId, orgId }, "payfast_reference_mismatch")
+        return res.status(400).send("INVALID")
+      }
+
+      if (checkout && checkout.plan !== mapPayloadPlanToPlanType(payload.custom_str1)) {
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "PLAN_MISMATCH",
+            error: "PayFast plan did not match pending checkout.",
+            processedAt: new Date(),
+          },
+        })
+        logger.warn({ reference, paymentId, orgId }, "payfast_plan_mismatch")
         return res.status(400).send("INVALID")
       }
 
@@ -405,6 +516,13 @@ billingRouter.post(
         : null
 
       if (alreadyProcessed) {
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "DUPLICATE",
+            processedAt: new Date(),
+          },
+        })
         return res.status(200).send("OK")
       }
 
@@ -432,6 +550,24 @@ billingRouter.post(
             expectedCents,
           },
         })
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "AMOUNT_MISMATCH",
+            error: `Expected ${expectedCents}, received ${amountCents ?? "null"}.`,
+            processedAt: new Date(),
+          },
+        })
+        if (checkout) {
+          await prisma.payFastCheckout.update({
+            where: { reference: checkout.reference },
+            data: {
+              status: "INVALID",
+              payfastPaymentId: paymentId,
+              rawPayload: payload,
+            },
+          })
+        }
         return res.status(400).send("INVALID")
       }
 
@@ -445,9 +581,59 @@ billingRouter.post(
           amountCents,
           paymentStatus: status,
           rawStatus: payload.payment_status ?? null,
+          payfastToken,
+        })
+
+        if (isInitialCheckout && checkout) {
+          await prisma.payFastCheckout.update({
+            where: { reference: checkout.reference },
+            data: {
+              status: "COMPLETE",
+              payfastPaymentId: paymentId,
+              payfastToken,
+              rawPayload: payload,
+              completedAt: new Date(),
+            },
+          })
+        }
+
+        await prisma.payFastNotification.update({
+          where: { id: notification.id },
+          data: {
+            validationStatus: "PROCESSED",
+            processedAt: new Date(),
+          },
         })
 
         return res.status(200).send("OK")
+      }
+
+      if (isCanceledPayFastStatus(status)) {
+        await prisma.orgSubscription.updateMany({
+          where: {
+            orgId,
+            paymentGateway: "PAYFAST",
+          },
+          data: {
+            status: SubscriptionStatus.CANCELED,
+          },
+        })
+      } else if (isFailedPayFastStatus(status)) {
+        const now = new Date()
+        const graceEndsAt = new Date(now)
+        graceEndsAt.setDate(graceEndsAt.getDate() + 7)
+        await prisma.orgSubscription.updateMany({
+          where: {
+            orgId,
+            paymentGateway: "PAYFAST",
+            status: SubscriptionStatus.ACTIVE,
+          },
+          data: {
+            status: SubscriptionStatus.PAST_DUE,
+            pastDueSince: now,
+            graceEndsAt,
+          },
+        })
       }
 
       await trackBillingEvent({
@@ -464,8 +650,40 @@ billingRouter.post(
         },
       })
 
+      if (checkout) {
+        await prisma.payFastCheckout.update({
+          where: { reference: checkout.reference },
+          data: {
+            status: isCanceledPayFastStatus(status)
+              ? "CANCELED"
+              : isFailedPayFastStatus(status)
+                ? "FAILED"
+                : "PENDING",
+            payfastPaymentId: paymentId,
+            payfastToken,
+            rawPayload: payload,
+          },
+        })
+      }
+
+      await prisma.payFastNotification.update({
+        where: { id: notification.id },
+        data: {
+          validationStatus: "PROCESSED",
+          processedAt: new Date(),
+        },
+      })
+
       return res.status(200).send("OK")
     } catch (error) {
+      await prisma.payFastNotification.update({
+        where: { id: notification.id },
+        data: {
+          validationStatus: "ERROR",
+          error: error instanceof Error ? error.message : String(error),
+          processedAt: new Date(),
+        },
+      })
       logger.error(
         { err: error, reference, paymentId, orgId },
         "payfast_notify_processing_failed",
@@ -558,6 +776,19 @@ billingRouter.post(
           paymentStatus: "COMPLETE",
           rawStatus: "DEV_SANDBOX_FALLBACK",
         })
+
+        if (reference) {
+          await prisma.payFastCheckout.updateMany({
+            where: {
+              orgId: req.orgId!,
+              reference,
+            },
+            data: {
+              status: "COMPLETE",
+              completedAt: new Date(),
+            },
+          })
+        }
       }
 
       res.json(ok({ completed: true }))

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { TLButton } from "@/components/tenderlens/button";
-import { completeSandboxCheckout, getSubscription } from "@/lib/billing.api";
+import { getSubscription } from "@/lib/billing.api";
 import type { Subscription } from "@/lib/billing.types";
 import { useAuth } from "@/lib/auth";
 
@@ -14,17 +14,24 @@ export default function BillingSuccessPage() {
   const [subscription, setSubscription] = React.useState<Subscription | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [polling, setPolling] = React.useState(false);
-  const [recovering, setRecovering] = React.useState(false);
-  const [recovered, setRecovered] = React.useState(false);
+  const [expectedPlan, setExpectedPlan] = React.useState<"PRO" | "BUSINESS" | null>(
+    null,
+  );
 
   React.useEffect(() => {
     setMounted(true);
+    const plan = new URLSearchParams(window.location.search).get("plan");
+    setExpectedPlan(plan === "PRO" || plan === "BUSINESS" ? plan : null);
   }, []);
 
+  const expectedSubscriptionPlan =
+    expectedPlan === "BUSINESS" ? "ENTERPRISE" : expectedPlan;
   const confirmed =
     subscription &&
     subscription.status === "ACTIVE" &&
-    subscription.plan !== "TRIAL";
+    (expectedSubscriptionPlan
+      ? subscription.plan === expectedSubscriptionPlan
+      : subscription.plan !== "TRIAL");
 
   React.useEffect(() => {
     if (!auth.isReady || !auth.isAuthed) return;
@@ -58,50 +65,6 @@ export default function BillingSuccessPage() {
     };
   }, [auth.isAuthed, auth.isReady]);
 
-  React.useEffect(() => {
-    if (
-      !mounted ||
-      !auth.isReady ||
-      !auth.isAuthed ||
-      confirmed ||
-      polling ||
-      recovering ||
-      recovered
-    ) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function recoverSandboxCheckout() {
-      setRecovering(true);
-      const recover = await completeSandboxCheckout();
-      if (cancelled) return;
-      setRecovering(false);
-      setRecovered(true);
-
-      if (!recover.ok) return;
-
-      const refreshed = await getSubscription();
-      if (!cancelled && refreshed.ok) {
-        setSubscription(refreshed.data.subscription);
-      }
-    }
-
-    void recoverSandboxCheckout();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    auth.isAuthed,
-    auth.isReady,
-    confirmed,
-    mounted,
-    polling,
-    recovered,
-    recovering,
-  ]);
   const primaryHref =
     mounted && auth.isAuthed ? "/settings/billing" : "/auth/login";
   const primaryLabel =
@@ -148,12 +111,10 @@ export default function BillingSuccessPage() {
               <>
                 <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
                 <div className="mt-4 text-lg font-semibold">
-                  {recovering ? "Finalizing sandbox checkout" : "Waiting for confirmation"}
+                  Waiting for confirmation
                 </div>
                 <div className="mt-2 text-sm text-muted-foreground">
-                  {recovering
-                    ? "TenderLens is completing the local sandbox payment because the webhook callback is not available in this environment."
-                    : "We are still waiting for the secure payment confirmation callback."}
+                  We are still waiting for the secure payment confirmation callback.
                 </div>
                 {!polling && !loading ? (
                   <div className="mt-3 text-sm text-muted-foreground">
