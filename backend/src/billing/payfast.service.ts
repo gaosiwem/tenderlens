@@ -17,6 +17,43 @@ type PayFastCheckoutArgs = {
 
 type PayFastNotifyPayload = Record<string, string>
 
+const PAYFAST_FIELD_ORDER = [
+  "merchant_id",
+  "merchant_key",
+  "return_url",
+  "cancel_url",
+  "notify_url",
+  "name_first",
+  "name_last",
+  "email_address",
+  "cell_number",
+  "m_payment_id",
+  "amount",
+  "item_name",
+  "item_description",
+  "custom_int1",
+  "custom_int2",
+  "custom_int3",
+  "custom_int4",
+  "custom_int5",
+  "custom_str1",
+  "custom_str2",
+  "custom_str3",
+  "custom_str4",
+  "custom_str5",
+  "email_confirmation",
+  "confirmation_address",
+  "payment_method",
+  "subscription_type",
+  "billing_date",
+  "recurring_amount",
+  "frequency",
+  "cycles",
+  "subscription_notify_email",
+  "subscription_notify_webhook",
+  "subscription_notify_buyer",
+] as const
+
 const PAYFAST_SANDBOX_DEFAULTS = {
   recurring: {
     merchantId: "10004002",
@@ -55,25 +92,43 @@ function getPayFastPassphrase() {
   return ""
 }
 
-function buildSignatureString(entries: Array<[string, string]>) {
-  const filtered = entries.filter(
-    ([key, value]) =>
-      key !== "signature" &&
-      value != null &&
-      String(value).trim().length > 0,
+function orderPayFastEntries(fields: Record<string, string>) {
+  const ordered: Array<[string, string]> = []
+  const remaining = new Set(Object.keys(fields))
+
+  for (const key of PAYFAST_FIELD_ORDER) {
+    if (Object.prototype.hasOwnProperty.call(fields, key)) {
+      ordered.push([key, fields[key]])
+      remaining.delete(key)
+    }
+  }
+
+  for (const key of Array.from(remaining).sort()) {
+    ordered.push([key, fields[key]])
+  }
+
+  return ordered
+}
+
+function buildSignatureString(fields: Record<string, string>) {
+  const filtered = orderPayFastEntries(fields).filter(
+    ([key, value]) => key !== "signature" && String(value).trim().length > 0,
   )
 
-  const pairs = filtered.map(([key, value]) => `${key}=${encodeValue(value)}`)
+  const pairs = filtered.map(([key, value]) => {
+    const trimmed = String(value).trim()
+    return `${key}=${encodeValue(trimmed)}`
+  })
   const passphrase = getPayFastPassphrase()
   if (passphrase) {
-    pairs.push(`passphrase=${encodeValue(passphrase)}`)
+    pairs.push(`passphrase=${encodeValue(passphrase.trim())}`)
   }
 
   return pairs.join("&")
 }
 
-function createSignatureFromEntries(entries: Array<[string, string]>) {
-  const signatureString = buildSignatureString(entries)
+function createSignature(fields: Record<string, string>) {
+  const signatureString = buildSignatureString(fields)
   return crypto.createHash("md5").update(signatureString).digest("hex")
 }
 
@@ -131,32 +186,29 @@ export function buildPayFastCheckout(args: PayFastCheckoutArgs) {
     amount,
     item_name: itemName,
     item_description: `${itemName} monthly subscription for ${args.orgName}`,
+    custom_str1: args.plan,
+    custom_str2: args.orgId,
+    custom_str3: args.userId,
     subscription_type: "1",
     billing_date: getBillingDate(),
     recurring_amount: amount,
     frequency: "3",
     cycles: "0",
-    custom_str1: args.plan,
-    custom_str2: args.orgId,
-    custom_str3: args.userId,
   }
+  const orderedFields = Object.fromEntries(orderPayFastEntries(fields))
 
   return {
     paymentUrl: getProcessUrl(),
     fields: {
-      ...fields,
-      signature: createSignatureFromEntries(
-        Object.entries(fields).map(([key, value]) => [key, String(value)]),
-      ),
+      ...orderedFields,
+      signature: createSignature(orderedFields),
     },
   }
 }
 
 export function verifyPayFastSignature(payload: PayFastNotifyPayload) {
   const signature = String(payload.signature ?? "")
-  const computed = createSignatureFromEntries(
-    Object.entries(payload).map(([key, value]) => [key, String(value)]),
-  )
+  const computed = createSignature(payload)
   return signature.length > 0 && signature === computed
 }
 

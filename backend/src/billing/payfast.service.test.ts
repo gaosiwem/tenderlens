@@ -34,6 +34,29 @@ describe("buildPayFastCheckout", () => {
 
     expect(checkout.paymentUrl).toBe("https://sandbox.payfast.co.za/eng/process")
     expect(checkout.fields).toHaveProperty("signature")
+    expect(Object.keys(checkout.fields)).toEqual([
+      "merchant_id",
+      "merchant_key",
+      "return_url",
+      "cancel_url",
+      "notify_url",
+      "name_first",
+      "name_last",
+      "email_address",
+      "m_payment_id",
+      "amount",
+      "item_name",
+      "item_description",
+      "custom_str1",
+      "custom_str2",
+      "custom_str3",
+      "subscription_type",
+      "billing_date",
+      "recurring_amount",
+      "frequency",
+      "cycles",
+      "signature",
+    ])
   })
 
   it("uses the PayFast production process URL only after sandbox mode is disabled", async () => {
