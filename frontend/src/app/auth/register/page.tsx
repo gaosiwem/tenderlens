@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { GoogleLogin } from "@react-oauth/google";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,16 @@ export default function RegisterPage() {
   const [email, setEmail] = React.useState("");
   const [name, setName] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const googleEnabled = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hostname !== "127.0.0.1") return;
+
+    const redirectUrl = new URL(window.location.href);
+    redirectUrl.hostname = "localhost";
+    window.location.replace(redirectUrl.toString());
+  }, []);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
@@ -37,6 +48,40 @@ export default function RegisterPage() {
                 Create your account to start tracking tenders and collaborating with your team.
               </div>
             </div>
+
+            {googleEnabled ? (
+              <div className="space-y-4">
+                <GoogleLogin
+                  logo_alignment="left"
+                  text="signup_with"
+                  onSuccess={async (credentialResponse) => {
+                    const credential = credentialResponse.credential;
+                    if (!credential) {
+                      toast.error("Google registration failed");
+                      return;
+                    }
+                    const res = await auth.loginWithGoogle(credential);
+                    if (!res.ok) {
+                      toast.error("Google registration failed", {
+                        description: res.message,
+                      });
+                      return;
+                    }
+                    toast.success("Account ready");
+                    router.push("/dashboard");
+                  }}
+                  onError={() => {
+                    toast.error("Google registration failed");
+                  }}
+                />
+
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="h-px flex-1 bg-border" />
+                  <span>or create account with email</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>

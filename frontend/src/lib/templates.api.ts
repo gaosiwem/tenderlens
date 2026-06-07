@@ -6,7 +6,7 @@ export async function listWatchTemplates() {
 }
 
 export async function applyWatchTemplate(templateId: string) {
-  return apiFetch<{ alertRuleId: string; keywords: string[] }>(
+  return apiFetch<{ alertRuleId: string; keywords: string[]; addedCount?: number }>(
     "/api/v1/templates/apply",
     {
       method: "POST",

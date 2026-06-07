@@ -7,7 +7,9 @@ type TrialTouch =
   | "WELCOME"
   | "DAY3"
   | "DAY10"
+  | "EXPIRY_72H"
   | "EXPIRY_48H"
+  | "EXPIRY_24H"
   | "POST_EXPIRY_DAY1"
   | "POST_EXPIRY_DAY7"
 
@@ -29,9 +31,24 @@ export async function runTrialCampaigns(now = new Date()) {
     const hoursToEnd = msToEnd / 3600000
 
     if (sub.status === "TRIALING") {
-      if (hoursToEnd <= env.TRIAL_EXPIRY_WARNING_HOURS && hoursToEnd > 0) {
+      if (hoursToEnd <= 72 && hoursToEnd > 48) {
+        queued += await emitTouch(sub.orgId, "EXPIRY_72H", {
+          hoursToEnd: Math.round(hoursToEnd),
+          trialEndsAt: trialEnds.toISOString(),
+        })
+      }
+
+      if (hoursToEnd <= 48 && hoursToEnd > 24) {
         queued += await emitTouch(sub.orgId, "EXPIRY_48H", {
           hoursToEnd: Math.round(hoursToEnd),
+          trialEndsAt: trialEnds.toISOString(),
+        })
+      }
+
+      if (hoursToEnd <= 24 && hoursToEnd > 0) {
+        queued += await emitTouch(sub.orgId, "EXPIRY_24H", {
+          hoursToEnd: Math.round(hoursToEnd),
+          trialEndsAt: trialEnds.toISOString(),
         })
       }
     }
@@ -51,12 +68,27 @@ export async function runTrialCampaigns(now = new Date()) {
 }
 
 async function emitTouch(orgId: string, touch: TrialTouch, meta: any) {
+  const existing = await prisma.notificationEvent.findFirst({
+    where: {
+      orgId,
+      type: NotificationType.ALERT_FIRED,
+      entityType: "OrgSubscription",
+      entityId: orgId,
+      meta: { path: ["touch"], equals: touch },
+    },
+    select: { id: true },
+  })
+  if (existing) return 0
+
   await emitEvent({
     orgId,
     type: NotificationType.ALERT_FIRED,
     entityType: "OrgSubscription",
     entityId: orgId,
     meta: { kind: "TRIAL_CAMPAIGN", touch, ...meta },
+    targetChannels: ["email"],
+    ignoreEventTypePrefs: true,
+    ignoreChannelPrefs: true,
   })
   return 1
 }

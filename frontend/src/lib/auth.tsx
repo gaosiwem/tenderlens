@@ -69,6 +69,12 @@ function setCachedProfile(profile: MeResponse | null) {
   }
 }
 
+function isPublicMarketingPath() {
+  if (typeof window === "undefined") return false;
+  const pathname = window.location.pathname || "";
+  return pathname === "/" || pathname === "/blog" || pathname.startsWith("/blog/");
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [state, setState] = React.useState<AuthState>(() => {
@@ -107,6 +113,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   React.useEffect(() => {
+    if (isPublicMarketingPath()) {
+      setState((current) => ({ ...current, isReady: true }));
+      return;
+    }
+
     refreshMe();
   }, [refreshMe]);
 

@@ -278,15 +278,41 @@ export const env = {
   SMS_ENABLED:
     (process.env.SMS_ENABLED ?? process.env.WHATSAPP_ENABLED ?? "false") ===
     "true",
-  SMS_PROVIDER:
-    process.env.SMS_PROVIDER ?? process.env.WHATSAPP_PROVIDER ?? "twilio",
+  SMS_PROVIDER: (
+    process.env.SMS_PROVIDER ??
+    process.env.WHATSAPP_PROVIDER ??
+    "smtp2go"
+  ).toLowerCase(),
   SMS_FROM_NUMBER:
     process.env.SMS_FROM_NUMBER ??
-    process.env.TWILIO_PHONE_NUMBER ??
     process.env.WHATSAPP_FROM_NUMBER ??
     "",
-  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID ?? "",
-  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN ?? "",
+  SMTP2GO_SMS_API_URL:
+    process.env.SMTP2GO_SMS_API_URL ?? "https://api.smtp2go.com/v3/sms/send",
+  SMTP2GO_API_KEY: process.env.SMTP2GO_API_KEY ?? "",
+  SMTP2GO_SMS_SENDER:
+    process.env.SMTP2GO_SMS_SENDER ?? process.env.SMS_FROM_NUMBER ?? "",
+  SMSSOUTHAFRICA_API_URL:
+    process.env.SMSSOUTHAFRICA_API_URL ??
+    "https://rest.mymobileapi.com/v3/BulkMessages",
+  SMSSOUTHAFRICA_CLIENT_ID:
+    process.env.SMSSOUTHAFRICA_CLIENT_ID ??
+    process.env.MYMOBILEAPI_CLIENT_ID ??
+    "",
+  SMSSOUTHAFRICA_CLIENT_SECRET:
+    process.env.SMSSOUTHAFRICA_CLIENT_SECRET ??
+    process.env.MYMOBILEAPI_CLIENT_SECRET ??
+    "",
+  SMSSOUTHAFRICA_SENDER_ID:
+    process.env.SMSSOUTHAFRICA_SENDER_ID ??
+    process.env.MYMOBILEAPI_SENDER_ID ??
+    "",
+  SMSSOUTHAFRICA_TEST_MODE:
+    (
+      process.env.SMSSOUTHAFRICA_TEST_MODE ??
+      process.env.MYMOBILEAPI_TEST_MODE ??
+      "false"
+    ) === "true",
 
   DEADLINE_EXTRACTION_ENABLED:
     (process.env.DEADLINE_EXTRACTION_ENABLED ?? "true") === "true",
@@ -519,6 +545,22 @@ if (env.NODE_ENV === "production") {
   for (const key of criticalKeys) {
     if (!env[key]) {
       throw new Error(`Missing critical env var in production: ${key}`)
+    }
+  }
+
+  if (env.SMS_ENABLED) {
+    if (env.SMS_PROVIDER === "smtp2go") {
+      if (!env.SMTP2GO_API_KEY) {
+        throw new Error("SMTP2GO_API_KEY is required when SMS_PROVIDER=smtp2go")
+      }
+    } else if (env.SMS_PROVIDER === "smssouthafrica") {
+      if (!env.SMSSOUTHAFRICA_CLIENT_ID || !env.SMSSOUTHAFRICA_CLIENT_SECRET) {
+        throw new Error(
+          "SMS South Africa credentials are required when SMS_PROVIDER=smssouthafrica",
+        )
+      }
+    } else if (env.SMS_PROVIDER !== "log") {
+      throw new Error(`Unsupported SMS_PROVIDER in production: ${env.SMS_PROVIDER}`)
     }
   }
 }

@@ -4,6 +4,7 @@ import { AppError } from "../../utils/responses"
 import { generateOtp, hashOtp } from "../../utils/otp"
 import { sendSms } from "../notifications/sms.sender"
 import { getEffectivePlanConfig } from "../../billing/effective-plan.service"
+import { buildSmsOtpContent } from "../notifications/message.builder"
 
 function minutesFromNow(m: number) {
   return new Date(Date.now() + m * 60_000)
@@ -88,10 +89,11 @@ export async function startVerification(args: {
     },
   })
 
-  await sendSms(
-    phoneNumber,
-    `TenderLens verification code: ${otp}. Expires in ${env.SMS_OTP_TTL_MINUTES} minutes.`,
-  )
+  const sms = buildSmsOtpContent({
+    otp,
+    ttlMinutes: env.SMS_OTP_TTL_MINUTES,
+  })
+  await sendSms(phoneNumber, sms.text)
 
   return {
     verificationId: row.id,

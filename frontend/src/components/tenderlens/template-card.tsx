@@ -26,7 +26,7 @@ export function TLTemplateCard(props: {
       return;
     }
 
-    const { addedCount } = res.data as any;
+    const addedCount = res.data.addedCount ?? 0;
 
     toast.success("Category applied", {
       description:

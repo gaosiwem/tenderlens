@@ -3,7 +3,10 @@ import { redis } from "../redis/client"
 import { prisma } from "../db/prisma"
 import { sendEmail } from "../modules/notifications/email.sender"
 import { sendSms } from "../modules/notifications/sms.sender"
-import { buildNotificationContent } from "../modules/notifications/message.builder"
+import {
+  buildNotificationContent,
+  buildSmsNotificationContent,
+} from "../modules/notifications/message.builder"
 import { env } from "../config/env"
 import { deliveryQueue } from "../queues/delivery.queue"
 import { captureBackgroundException } from "../monitoring/sentry"
@@ -24,6 +27,7 @@ async function processOne(id: string) {
     where: { id: item.eventId },
   })
   const { subject, text, html } = buildNotificationContent(event)
+  const sms = buildSmsNotificationContent(event)
 
   await prisma.notificationDelivery.update({
     where: { id: item.id },
@@ -34,7 +38,7 @@ async function processOne(id: string) {
     if (item.channel === "email") {
       await sendEmail(item.to, subject, text, html)
     } else if (item.channel === "whatsapp" || item.channel === "sms") {
-      await sendSms(item.to, text)
+      await sendSms(item.to, sms.text)
     }
 
     await prisma.notificationDelivery.update({

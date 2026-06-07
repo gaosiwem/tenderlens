@@ -214,6 +214,10 @@ function normalizeHostFromPublicUrl(value: string | undefined, fallback: string)
   }
 }
 
+function isPublicMarketingPath(pathname: string) {
+  return pathname === "/" || pathname === "/blog" || pathname.startsWith("/blog/");
+}
+
 function shouldRedirectToLogin() {
   if (typeof window === "undefined") return false;
   const currentPath = window.location.pathname || "";
@@ -223,6 +227,7 @@ function shouldRedirectToLogin() {
     currentHost,
   );
 
+  if (isPublicMarketingPath(currentPath)) return false;
   if (currentHost !== appHost) return false;
   return !currentPath.startsWith("/auth/");
 }

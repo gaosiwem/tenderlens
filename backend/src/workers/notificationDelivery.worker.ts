@@ -1,7 +1,10 @@
 import { prisma } from "../db/prisma"
 import { sendEmail } from "../modules/notifications/email.sender"
 import { sendSms } from "../modules/notifications/sms.sender"
-import { buildNotificationContent } from "../modules/notifications/message.builder"
+import {
+  buildNotificationContent,
+  buildSmsNotificationContent,
+} from "../modules/notifications/message.builder"
 import { env } from "../config/env"
 
 export async function runNotificationDeliveryById(id: string) {
@@ -15,6 +18,7 @@ export async function runNotificationDeliveryById(id: string) {
     where: { id: item.eventId, orgId: item.orgId },
   })
   const { subject, text, html } = buildNotificationContent(event)
+  const sms = buildSmsNotificationContent(event)
 
   try {
     await prisma.notificationDelivery.update({
@@ -25,7 +29,7 @@ export async function runNotificationDeliveryById(id: string) {
     if (item.channel === "email") {
       await sendEmail(item.to, subject, text, html)
     } else if (item.channel === "whatsapp" || item.channel === "sms") {
-      await sendSms(item.to, text)
+      await sendSms(item.to, sms.text)
     }
 
     await prisma.notificationDelivery.update({

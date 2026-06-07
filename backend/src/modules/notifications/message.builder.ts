@@ -14,6 +14,10 @@ export type EmailMessageContent = {
   html: string
 }
 
+export type SmsMessageContent = {
+  text: string
+}
+
 const WATCHLIST_REMINDER_LABELS: Record<string, string> = {
   CLOSING_7D: "Closing in 7 days",
   CLOSING_24H: "Closing in 24 hours",
@@ -25,7 +29,9 @@ const TRIAL_TOUCH_LABELS: Record<string, string> = {
   WELCOME: "Welcome to your trial",
   DAY3: "Getting started tips",
   DAY10: "Trial progress check-in",
-  EXPIRY_48H: "Trial expires soon",
+  EXPIRY_72H: "Trial ends in 3 days",
+  EXPIRY_48H: "Trial ends in 2 days",
+  EXPIRY_24H: "Trial ends tomorrow",
   POST_EXPIRY_DAY1: "Your trial has ended",
   POST_EXPIRY_DAY7: "Last reminder to reactivate",
 }
@@ -129,6 +135,17 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;")
 }
 
+function compactWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim()
+}
+
+function truncateSmsPart(value: string, maxLength: number) {
+  const compact = compactWhitespace(value)
+  if (compact.length <= maxLength) return compact
+  if (maxLength <= 3) return compact.slice(0, maxLength)
+  return `${compact.slice(0, maxLength - 3).trimEnd()}...`
+}
+
 function normalizeColor(value: string, fallback: string) {
   const v = String(value || "").trim()
   return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(v) ? v : fallback
@@ -153,6 +170,14 @@ function resolveBrandTheme(): BrandTheme {
 function resolveCtaUrl(event: NotificationEventLike) {
   const meta = toMetaObject(event.meta)
   const kind = readString(meta, "kind")
+  const touch = readString(meta, "touch")
+  if (
+    kind === "TRIAL_CAMPAIGN" &&
+    ["EXPIRY_72H", "EXPIRY_48H", "EXPIRY_24H"].includes(touch ?? "")
+  ) {
+    return `${env.FRONTEND_URL}/pricing`
+  }
+
   if (kind === "WATCHLIST_BATCH_SUMMARY") {
     return `${env.FRONTEND_URL}/watchlist`
   }
@@ -170,6 +195,74 @@ function resolveCtaUrl(event: NotificationEventLike) {
   }
 
   return `${env.FRONTEND_URL}/admin/notifications`
+}
+
+function describeTrialExpiryTouch(touch: string | null) {
+  if (touch === "EXPIRY_24H") {
+    return {
+      days: 1,
+      subject: "Your TenderLens trial ends tomorrow",
+      title: "Your trial ends tomorrow",
+      timeLabel: "In about 1 day",
+    }
+  }
+  if (touch === "EXPIRY_48H") {
+    return {
+      days: 2,
+      subject: "Your TenderLens trial ends in 2 days",
+      title: "Your trial ends in 2 days",
+      timeLabel: "In about 2 days",
+    }
+  }
+  return {
+    days: 3,
+    subject: "Your TenderLens trial ends in 3 days",
+    title: "Keep your TenderLens workspace active",
+    timeLabel: "In about 3 days",
+  }
+}
+
+function buildTrialExpiryContent(
+  event: NotificationEventLike | null,
+): EmailMessageContent {
+  const meta = toMetaObject(event?.meta)
+  const touch = readString(meta, "touch")
+  const copy = describeTrialExpiryTouch(touch)
+  const trialEndsAt = toHumanDate(readString(meta, "trialEndsAt"))
+  const hoursToEnd = readNumber(meta, "hoursToEnd")
+  const ctaUrl = resolveCtaUrl(event ?? {})
+  const details = [
+    {
+      label: "Trial ends",
+      value:
+        trialEndsAt ??
+        (hoursToEnd ? `In about ${hoursToEnd} hours` : copy.timeLabel),
+    },
+    { label: "Pro", value: "R299 / month for up to 5 team members" },
+    { label: "Business", value: "R1,499 / month for larger tender teams" },
+  ]
+
+  const { text, html } = buildBrandedEmailLayout({
+    title: copy.title,
+    subtitle: `Your trial ends in ${copy.days === 1 ? "1 day" : `${copy.days} days`}. Subscribe before then to keep your watchlist, alerts, AI tender analysis, comparisons, exports, and team workspace running without interruption.`,
+    details,
+    ctaLabel: "Choose a plan",
+    ctaUrl,
+  })
+
+  return {
+    subject: copy.subject,
+    text: [
+      "Hi there,",
+      "",
+      `Your TenderLens trial ends in ${copy.days === 1 ? "1 day" : `${copy.days} days`}. We hope it has helped your team stay closer to the tenders, deadlines, alerts, and bid work that matter.`,
+      "",
+      "Subscribe before your trial ends to keep your workspace active without interruption.",
+      "",
+      ...text.split("\n").filter(Boolean),
+    ].join("\n"),
+    html,
+  }
 }
 
 export type BrandedEmailLayoutArgs = {
@@ -390,6 +483,14 @@ export function buildNotificationContent(event: NotificationEventLike | null): E
   const eventTime = toIsoString(event?.createdAt ?? null) || new Date().toISOString()
   const meta = toMetaObject(event?.meta)
   const kind = readString(meta, "kind")
+  const touch = readString(meta, "touch")
+  if (
+    kind === "TRIAL_CAMPAIGN" &&
+    ["EXPIRY_72H", "EXPIRY_48H", "EXPIRY_24H"].includes(touch ?? "")
+  ) {
+    return buildTrialExpiryContent(event)
+  }
+
   const subject = buildSubject(kind, eventType, meta)
   const title = buildTitle(kind, eventType)
   const subtitle = buildSubtitle(kind, eventType, eventTime, meta)
@@ -404,6 +505,40 @@ export function buildNotificationContent(event: NotificationEventLike | null): E
   })
 
   return { subject, text, html }
+}
+
+export function buildSmsOtpContent(args: {
+  otp: string
+  ttlMinutes: number
+}): SmsMessageContent {
+  return {
+    text: `TenderLens code: ${args.otp}. Expires in ${args.ttlMinutes} minutes.`,
+  }
+}
+
+export function buildSmsNotificationContent(
+  event: NotificationEventLike | null,
+): SmsMessageContent {
+  const eventType = event?.type || "Event"
+  const eventTime =
+    toIsoString(event?.createdAt ?? null) || new Date().toISOString()
+  const meta = toMetaObject(event?.meta)
+  const kind = readString(meta, "kind")
+  const title = buildTitle(kind, eventType)
+  const subtitle = buildSubtitle(kind, eventType, eventTime, meta)
+  const details = buildDetails(meta, kind).slice(0, 2)
+  const ctaUrl = resolveCtaUrl(event ?? {})
+  const detailText = details.map((d) => `${d.label}: ${d.value}`).join(" | ")
+
+  const parts = [
+    `TenderLens: ${title}.`,
+    detailText || subtitle,
+    ctaUrl,
+  ].filter(Boolean)
+
+  return {
+    text: truncateSmsPart(parts.join(" "), 320),
+  }
 }
 
 export function buildDailyDigestContent(args: {
