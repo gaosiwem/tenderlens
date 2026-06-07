@@ -407,6 +407,44 @@ export const env = {
   PDF_EXPORT_ENABLED: (process.env.PDF_EXPORT_ENABLED ?? "true") === "true",
   XLSX_EXPORT_ENABLED: (process.env.XLSX_EXPORT_ENABLED ?? "true") === "true",
   RISK_SCORING_ENABLED: (process.env.RISK_SCORING_ENABLED ?? "true") === "true",
+  COMPLIANCE_AUDITOR_ENABLED:
+    (process.env.COMPLIANCE_AUDITOR_ENABLED ?? "true") === "true",
+  COMPLIANCE_AUDITOR_MODEL:
+    process.env.COMPLIANCE_AUDITOR_MODEL ?? "gpt-4o-mini",
+  COMPLIANCE_AUDITOR_MAX_TOKENS: Number(
+    process.env.COMPLIANCE_AUDITOR_MAX_TOKENS ?? "1800",
+  ),
+  COMPLIANCE_AUDITOR_MAX_CHUNKS: Number(
+    process.env.COMPLIANCE_AUDITOR_MAX_CHUNKS ?? "40",
+  ),
+  COMPLIANCE_AUDITOR_QUEUE_ENABLED:
+    (process.env.COMPLIANCE_AUDITOR_QUEUE_ENABLED ?? "true") === "true",
+  COMPLIANCE_AUDITOR_SCORE_PASS: Number(
+    process.env.COMPLIANCE_AUDITOR_SCORE_PASS ?? "80",
+  ),
+  COMPLIANCE_AUDITOR_SCORE_WARNING: Number(
+    process.env.COMPLIANCE_AUDITOR_SCORE_WARNING ?? "60",
+  ),
+  BID_REVIEWER_ENABLED:
+    (process.env.BID_REVIEWER_ENABLED ?? "true") === "true",
+  BID_REVIEWER_MODEL: process.env.BID_REVIEWER_MODEL ?? "gpt-4o-mini",
+  BID_REVIEWER_MAX_TOKENS: Number(
+    process.env.BID_REVIEWER_MAX_TOKENS ?? "2200",
+  ),
+  BID_REVIEWER_MAX_TENDER_CHUNKS: Number(
+    process.env.BID_REVIEWER_MAX_TENDER_CHUNKS ?? "30",
+  ),
+  BID_REVIEWER_MAX_PROPOSAL_CHUNKS: Number(
+    process.env.BID_REVIEWER_MAX_PROPOSAL_CHUNKS ?? "50",
+  ),
+  BID_REVIEWER_QUEUE_ENABLED:
+    (process.env.BID_REVIEWER_QUEUE_ENABLED ?? "true") === "true",
+  BID_REVIEWER_SCORE_PASS: Number(
+    process.env.BID_REVIEWER_SCORE_PASS ?? "80",
+  ),
+  BID_REVIEWER_SCORE_WARNING: Number(
+    process.env.BID_REVIEWER_SCORE_WARNING ?? "60",
+  ),
 
   GOVERNANCE_STRICT: (process.env.GOVERNANCE_STRICT ?? "true") === "true",
 

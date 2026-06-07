@@ -122,7 +122,15 @@ export async function getEffectivePlanConfig(orgId: string) {
     }
   }
 
-  if (!isBusinessPlan(sub.plan) && sub.status !== "TRIALING") {
+  if (sub.status === "TRIALING") {
+    return {
+      subscription: sub,
+      config: clonePlanConfig(baseConfig),
+      policy: null,
+    }
+  }
+
+  if (!isBusinessPlan(sub.plan)) {
     return {
       subscription: sub,
       config: clonePlanConfig(baseConfig),

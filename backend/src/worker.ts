@@ -22,6 +22,8 @@ import { emitEvent } from "./modules/notifications/notifications.service"
 import { NotificationType } from "@prisma/client"
 
 import { startDeliveryWorker } from "./workers/delivery.worker"
+import { startComplianceWorker } from "./workers/compliance.worker"
+import { startBidReviewWorker } from "./workers/bidReview.worker"
 import { logTenderChange } from "./modules/tenders/changeLog.service"
 
 initSentry("worker")
@@ -395,3 +397,5 @@ app.get("/worker/ready", async (_req, res) => {
 app.listen(8090, () => {})
 
 startDeliveryWorker()
+startComplianceWorker()
+startBidReviewWorker()

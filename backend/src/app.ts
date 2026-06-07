@@ -35,6 +35,8 @@ import { workspaceRouter } from "./modules/workspace/workspace.routes"
 import { orgDocsRouter } from "./modules/orgDocs/orgDocs.routes"
 import { attachmentsRouter } from "./modules/attachments/attachments.routes"
 import { riskRouter } from "./modules/risk/risk.routes"
+import { complianceRouter } from "./modules/compliance/compliance.routes"
+import { bidReviewRouter } from "./modules/bidReview/bidReview.routes"
 import { invitesRouter } from "./modules/org/invites.routes"
 import { inviteAcceptRouter } from "./modules/org/invites.accept"
 import { experimentsRouter } from "./billing/experiments.routes"
@@ -140,6 +142,8 @@ export function createApp() {
   app.use("/api/v1/workspace", workspaceRouter)
   app.use("/api/v1/attachments", attachmentsRouter)
   app.use("/api/v1/risk", riskRouter)
+  app.use("/api/v1", complianceRouter)
+  app.use("/api/v1", bidReviewRouter)
   app.use("/api/v1/exports", exportRouter)
   app.use("/api/v1/business", businessRouter)
 

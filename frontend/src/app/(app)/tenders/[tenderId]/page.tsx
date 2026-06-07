@@ -8,6 +8,8 @@ import {
   Clock,
   Database,
   ListChecks,
+  ShieldCheck,
+  FileCheck2,
 } from "lucide-react";
 import { TenderLensAppShell } from "@/components/tenderlens/app-shell";
 import { TLSection } from "@/components/tenderlens/section";
@@ -410,6 +412,18 @@ export default function TenderDetailPage() {
                 <TLButton variant="outline">
                   <FileText className="size-4 mr-2" />
                   Summary
+                </TLButton>
+              </Link>
+              <Link href={`/tenders/${tender.id}/compliance`}>
+                <TLButton variant="outline">
+                  <ShieldCheck className="size-4 mr-2" />
+                  Compliance
+                </TLButton>
+              </Link>
+              <Link href={`/tenders/${tender.id}/bid-review`}>
+                <TLButton variant="outline">
+                  <FileCheck2 className="size-4 mr-2" />
+                  Bid Review
                 </TLButton>
               </Link>
             </>

@@ -46,6 +46,8 @@ model User {
   mentionsReceived     Mention[]              @relation("MentionTo")
   taskReminderLogs     TaskReminderLog[]
   referralCodes        ReferralCode[]
+  complianceAudits     ComplianceAudit[]      @relation("ComplianceAuditCreatedBy")
+  bidReviews           BidReview[]            @relation("BidReviewCreatedBy")
 }
 
 model Organization {
@@ -97,6 +99,10 @@ model Organization {
   workspaceTemplates   WorkspaceTemplate[]
   integrationEndpoints OrgIntegrationEndpoint[]
   supportTickets       OrgSupportTicket[]
+  complianceAudits     ComplianceAudit[]
+  complianceFindings   ComplianceFinding[]
+  bidReviews           BidReview[]
+  bidReviewFindings    BidReviewFinding[]
 }
 
 model Membership {
@@ -256,6 +262,8 @@ model Tender {
   comparisonsB TenderComparison[] @relation("ComparisonB")
   bidChecklists BidChecklist[]
   bidWorkspaces BidWorkspace[]
+  complianceAudits ComplianceAudit[]
+  bidReviews BidReview[]
 
   @@index([orgId])
   @@index([externalId])
@@ -335,6 +343,7 @@ model BidWorkspace {
   tasks       BidTask[]
   attachments BidAttachment[]
   activities  BidActivityLog[]
+  bidReviews  BidReview[]
 
   @@unique([orgId, tenderId])
   @@index([orgId])
@@ -530,6 +539,150 @@ model BidChecklist {
   @@unique([orgId, tenderId])
   @@index([orgId])
   @@index([tenderId])
+}
+
+enum ComplianceAuditStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ComplianceFindingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model ComplianceAudit {
+  id          String                @id @default(uuid())
+  orgId       String
+  tenderId    String
+  status      ComplianceAuditStatus @default(PENDING)
+  score       Int?
+  summary     String?
+  missing     String[]              @default([])
+  risks       String[]              @default([])
+  model       String?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdById String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender    Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  createdBy User?        @relation("ComplianceAuditCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  findings  ComplianceFinding[]
+
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ComplianceFinding {
+  id          String                    @id @default(uuid())
+  orgId       String
+  auditId     String
+  category    String
+  title       String
+  severity    ComplianceFindingSeverity
+  status      String
+  requirement String?
+  evidence    Json?
+  suggestion  String?
+  createdAt   DateTime                  @default(now())
+
+  org   Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  audit ComplianceAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([auditId])
+  @@index([category])
+  @@index([severity])
+}
+
+enum BidReviewStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum BidReviewFindingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BidReviewFindingCategory {
+  UNANSWERED_REQUIREMENT
+  WEAK_RESPONSE
+  MISSING_EVIDENCE
+  POOR_STRUCTURE
+  COMPLIANCE_GAP
+  UNCLEAR_PRICING
+  EVALUATOR_RED_FLAG
+}
+
+model BidReview {
+  id              String          @id @default(uuid())
+  orgId           String
+  tenderId        String
+  workspaceId     String?
+  status          BidReviewStatus @default(PENDING)
+  score           Int?
+  summary         String?
+  strengths       String[]        @default([])
+  weaknesses      String[]        @default([])
+  redFlags        String[]        @default([])
+  proposalFileIds String[]        @default([])
+  model           String?
+  error           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdById     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  org       Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tender    Tender        @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  workspace BidWorkspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  createdBy User?         @relation("BidReviewCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  findings  BidReviewFinding[]
+
+  @@index([orgId])
+  @@index([tenderId])
+  @@index([workspaceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model BidReviewFinding {
+  id              String                   @id @default(uuid())
+  orgId           String
+  reviewId        String
+  category        BidReviewFindingCategory
+  title           String
+  severity        BidReviewFindingSeverity
+  affectedSection String?
+  requirement     String?
+  proposalExcerpt String?
+  evidence        Json?
+  recommendation  String?
+  createdAt       DateTime                 @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  review BidReview    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([reviewId])
+  @@index([category])
+  @@index([severity])
 }
 
 model ProcessingJob {
