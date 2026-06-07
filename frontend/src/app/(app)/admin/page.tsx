@@ -24,9 +24,9 @@ const ADMIN_MODULES = [
     bg: "bg-emerald-500/10",
   },
   {
-    name: "Billing Analytics",
+    name: "Advanced Analytics",
     description:
-      "Analyze billing events, conversions, and partner-attributed upgrades.",
+      "Track user adoption, paid vs trial state, and the product actions people are taking.",
     href: "/admin/billing-analytics",
     icon: Activity,
     color: "text-blue-500",
