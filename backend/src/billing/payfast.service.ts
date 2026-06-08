@@ -170,7 +170,7 @@ export function buildPayFastCheckout(args: PayFastCheckoutArgs) {
 
   const itemName =
     args.plan === "PRO"
-      ? "TenderLens Professional"
+      ? "TenderLens Pro"
       : "TenderLens Business"
   const amount = amountToString(args.amountCents)
   const fields = {

@@ -61,7 +61,7 @@ export function formatPlanDisplayName(
     case "TRIAL":
       return "Trial";
     case "PRO":
-      return "Professional";
+      return "Pro";
     case "BUSINESS":
     case "ENTERPRISE":
       return "Business";

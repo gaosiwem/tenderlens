@@ -10,46 +10,44 @@ import { useBilling } from "@/hooks/use-billing";
 import { trackBillingEvent } from "@/lib/billing-analytics.api";
 import { formatPlanDisplayName } from "@/lib/billing.types";
 
+type PublicPlan = "TRIAL" | "PRO" | "BUSINESS";
+
 export default function PricingPage() {
   const { subscription } = useBilling();
   const [loading, setLoading] = React.useState<string | null>(null);
   const currentPlan = subscription?.plan ?? "TRIAL";
+
   const trialFeatures = [
+    "14-day full-access trial",
     "Unlimited team members during trial",
-    "View Open, Awarded, Closed, and Cancelled tenders",
-    "Unlimited watched tenders",
-    "Unlimited AI queries during trial",
-    "Advanced email and SMS alerts",
-    "Tender comparison, workspace, exports, and risk scoring",
+    "Compare, workspace, exports, and alerts",
+    "Compliance audit and bid review included",
   ];
-  const proOnlyFeatures = [
+
+  const proFeatures = [
     "Up to 5 team members",
-    "Unlimited watchlist",
-    "Unlimited AI queries per month",
-    "Tender comparison (Compare)",
-    "Team workspace & tasks",
-    "Bid checklists & risk scoring",
-    "PDF & XLSX exports",
-    "SMS & Email alerts",
+    "Unlimited AI workflows and watchlist",
+    "Open, awarded, closed, and cancelled tenders",
+    "Compare, workspace, exports, and risk scoring",
+    "Advanced email and SMS alerts",
+    "Custom alert rules",
+    "Compliance audit and bid review included",
   ];
-  const businessOnlyFeatures = [
-    "Includes everything from Pro",
+
+  const businessFeatures = [
+    "Everything in Pro",
     "Up to 15 team members",
     "Advanced alert automations",
-    "Workspace categories & task governance",
-    "Bid analytics dashboards",
-    "API-style exports and integrations",
-    "Dedicated onboarding assistance",
-    "Priority support & SLAs",
-    "Custom feature limits",
-    "Dedicated account manager",
+    "Business profile context across AI workflows",
+    "Bid analytics and integration-ready exports",
+    "Priority support and SLA cover",
+    "Dedicated account management",
+    "Onboarding help and stronger governance",
   ];
-  const proFeatures = [...proOnlyFeatures];
-  const businessFeatures = [...businessOnlyFeatures];
 
   async function logPlanEvent(
     name: string,
-    plan: "TRIAL" | "PRO" | "BUSINESS",
+    plan: PublicPlan,
     meta?: Record<string, unknown>,
   ) {
     await trackBillingEvent(name, { plan, currentPlan, ...meta });
@@ -105,12 +103,15 @@ export default function PricingPage() {
       <TLSection
         title="Choose your plan"
         description="Simple monthly plans for growing tender teams."
+        className="space-y-6"
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <TLPlanCard
             plan="TRIAL"
-            title="Trial with Full Access"
-            priceLabel="Full access during trial"
+            title="Trial"
+            priceLabel="14 days free"
+            description="Full access for evaluation."
             ctaLabel="Current Plan"
             onCta={() => {}}
             current={subscription}
@@ -120,8 +121,10 @@ export default function PricingPage() {
             plan="PRO"
             title={formatPlanDisplayName("PRO")}
             priceLabel="R299 / month"
+            description="For active tender teams."
             ctaLabel={loading === "PRO" ? "Connecting..." : "Upgrade to Pro"}
             highlight
+            highlightLabel="Recommended"
             loading={loading === "PRO"}
             onCta={() => upgrade("PRO")}
             current={subscription}
@@ -131,6 +134,7 @@ export default function PricingPage() {
             plan="BUSINESS"
             title={formatPlanDisplayName("BUSINESS")}
             priceLabel="R1499 / month"
+            description="For larger tender operations."
             ctaLabel={
               loading === "BUSINESS" ? "Connecting..." : "Upgrade to Business"
             }

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { FileText, Trash2, Upload } from "lucide-react";
+import { Download, ExternalLink, FileText, Trash2, Upload } from "lucide-react";
 import { TenderLensAppShell } from "@/components/tenderlens/app-shell";
 import { TLSection } from "@/components/tenderlens/section";
 import { TLButton } from "@/components/tenderlens/button";
@@ -17,6 +17,7 @@ import {
 import {
   deleteOrgBusinessDoc,
   listOrgBusinessDocs,
+  openOrgBusinessDoc,
   uploadOrgBusinessDoc,
 } from "@/lib/org-docs.api";
 import type { OrgBusinessDocFile } from "@/lib/org-docs.types";
@@ -118,6 +119,20 @@ export default function OrgDocsPage() {
     toast.success("Document deleted");
     setPendingDeleteDoc(null);
     await load();
+  }
+
+  async function openDocument(doc: OrgBusinessDocFile) {
+    try {
+      await openOrgBusinessDoc({
+        fileId: doc.id,
+        filename: doc.originalFilename,
+        mimeType: doc.mimeType,
+      });
+    } catch (error) {
+      toast.error("Unable to open document", {
+        description: error instanceof Error ? error.message : "Please try again shortly.",
+      });
+    }
   }
 
   React.useEffect(() => {
@@ -239,9 +254,21 @@ export default function OrgDocsPage() {
                     className="px-4 py-3 flex items-center justify-between gap-3"
                   >
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void openDocument(doc)}
+                        className="flex items-center gap-2 text-left text-sm font-medium text-foreground transition hover:text-primary"
+                      >
                         <FileText className="size-4 text-primary" />
-                        {doc.originalFilename}
+                        <span className="truncate">{doc.originalFilename}</span>
+                        {doc.mimeType === "application/pdf" ? (
+                          <ExternalLink className="size-3.5 shrink-0" />
+                        ) : (
+                          <Download className="size-3.5 shrink-0" />
+                        )}
+                      </button>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {formatSize(doc.sizeBytes)}
                       </div>
                       {doc.status === "failed" && doc.statusMessage ? (
                         <div className="text-xs text-red-600 truncate max-w-[40ch]">

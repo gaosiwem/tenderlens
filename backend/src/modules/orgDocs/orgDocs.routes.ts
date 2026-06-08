@@ -130,6 +130,16 @@ async function getOrCreateProfileTender(args: { orgId: string; userId: string })
 
 export const orgDocsRouter = Router()
 
+function contentDispositionForDoc(args: {
+  mimeType: string
+  originalFilename: string
+}) {
+  const encoded = encodeURIComponent(args.originalFilename)
+  const disposition =
+    args.mimeType === "application/pdf" ? "inline" : "attachment"
+  return `${disposition}; filename="${encoded}"; filename*=UTF-8''${encoded}`
+}
+
 orgDocsRouter.get(
   "/files",
   requireAuth,
@@ -342,6 +352,57 @@ orgDocsRouter.post(
           processingJobId: processingJob.id,
         }),
       )
+    } catch (e) {
+      next(e)
+    }
+  },
+)
+
+orgDocsRouter.get(
+  "/files/:fileId/content",
+  requireAuth,
+  requireOrgMembership,
+  requireRole("VIEWER"),
+  async (req, res, next) => {
+    try {
+      const orgId = req.orgId!
+      const fileId = String(req.params.fileId || "").trim()
+      if (!fileId) {
+        throw new AppError("VALIDATION_ERROR", "Missing file id", 400)
+      }
+
+      const profile = await prisma.tender.findFirst({
+        where: { orgId, source: ORG_PROFILE_TENDER_SOURCE },
+        select: { id: true },
+      })
+      if (!profile) {
+        throw new AppError("NOT_FOUND", "Organization profile not found", 404)
+      }
+
+      const file = await prisma.tenderFile.findFirst({
+        where: { id: fileId, orgId, tenderId: profile.id },
+        select: {
+          id: true,
+          storageKey: true,
+          originalFilename: true,
+          mimeType: true,
+        },
+      })
+      if (!file) {
+        throw new AppError("NOT_FOUND", "Business document not found", 404)
+      }
+
+      const content = await storage().getObject({ key: file.storageKey })
+      res.setHeader("Content-Type", file.mimeType || "application/octet-stream")
+      res.setHeader(
+        "Content-Disposition",
+        contentDispositionForDoc({
+          mimeType: file.mimeType,
+          originalFilename: file.originalFilename,
+        }),
+      )
+      res.setHeader("Content-Length", String(content.length))
+      return res.status(200).send(content)
     } catch (e) {
       next(e)
     }

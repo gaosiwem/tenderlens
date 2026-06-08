@@ -20,10 +20,32 @@ if (resolvedEnvPath) {
   dotenv.config()
 }
 
+const runningInDocker = existsSync("/.dockerenv")
+
 const storageDriver = (
   process.env.STORAGE_DRIVER ?? "local"
 ) as "local" | "s3" | "supabase"
 const isSupabaseStorage = storageDriver === "supabase"
+
+function normalizeDockerLoopbackUrl(value: string) {
+  if (!runningInDocker || !value) return value
+
+  try {
+    const parsed = new URL(value)
+    if (
+      parsed.hostname === "localhost" ||
+      parsed.hostname === "127.0.0.1" ||
+      parsed.hostname === "::1"
+    ) {
+      parsed.hostname = "host.docker.internal"
+      return parsed.toString().replace(/\/$/, "")
+    }
+  } catch {
+    return value
+  }
+
+  return value
+}
 
 function resolveObjectStorageValue(args: {
   supabaseEnv: string
@@ -31,14 +53,16 @@ function resolveObjectStorageValue(args: {
   fallback: string
 }) {
   if (isSupabaseStorage) {
-    return (
+    return normalizeDockerLoopbackUrl(
       process.env[args.supabaseEnv] ??
-      process.env[args.genericEnv] ??
-      args.fallback
+        process.env[args.genericEnv] ??
+        args.fallback,
     )
   }
 
-  return process.env[args.genericEnv] ?? args.fallback
+  return normalizeDockerLoopbackUrl(
+    process.env[args.genericEnv] ?? args.fallback,
+  )
 }
 
 function parseOriginList(rawValue: string | undefined, envName: string) {
