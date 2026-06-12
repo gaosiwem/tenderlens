@@ -18,9 +18,10 @@ function stripPort(host: string) {
 }
 
 function withHost(request: NextRequest, host: string, pathname?: string) {
-  const url = request.nextUrl.clone();
+  const url = new URL(request.url);
   url.protocol = "https:";
-  url.host = host;
+  url.hostname = host;
+  url.port = "";
   if (pathname) url.pathname = pathname;
   return url;
 }
@@ -83,7 +84,7 @@ export function middleware(request: NextRequest) {
 
     if (host === appHost) {
       if (nextUrl.pathname === "/") {
-        return NextResponse.redirect(new URL("/dashboard", nextUrl));
+        return NextResponse.redirect(withHost(request, appHost, "/dashboard"));
       }
 
       if (isMarketingPath(nextUrl.pathname) && !isAuthOrUtilityPath(nextUrl.pathname)) {
